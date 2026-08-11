@@ -1,0 +1,8 @@
+{
+  "name": "Plurality",
+  "description": "Mock interaction environment for an LOSM Multi-Agent coding workflow.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
