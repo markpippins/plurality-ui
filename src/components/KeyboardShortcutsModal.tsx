@@ -16,6 +16,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     category: 'System & Overlays',
     items: [
+      { keys: ['⌘K', 'Ctrl+K', '/'], description: 'Focus Global Search Bar (Agents, Logs, Task IDs)', actionLabel: 'Global Search' },
       { keys: ['?'], description: 'Toggle Keyboard Shortcuts Overlay', actionLabel: 'Help Panel' },
       { keys: ['G'], description: 'Open D3.js Task & Agent Dependency Graph', actionLabel: 'Task Graph' },
       { keys: ['C'], description: 'Open Agent Persona & Parameter Matrix', actionLabel: 'Agent Config' },
@@ -38,6 +39,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     category: 'Work Request Task Pipeline',
     items: [
+      { keys: ['I'], description: 'Open Work Request Detail Popup Window', actionLabel: 'Request Detail' },
       { keys: ['T'], description: 'Cycle focus across active Work Requests', actionLabel: 'Next Task' },
     ]
   }
@@ -80,6 +82,13 @@ export function KeyboardShortcutsModal() {
       if (e.key === '?' || (e.shiftKey && e.key === '/')) {
         e.preventDefault();
         toggleShortcutsModal();
+        return;
+      }
+
+      // 'i' or 'I' -> Open Work Request Detail Popup
+      if (e.key === 'i' || e.key === 'I') {
+        e.preventDefault();
+        BackendService.openWorkRequestDetailModal();
         return;
       }
 
@@ -169,11 +178,11 @@ export function KeyboardShortcutsModal() {
                     Keyboard Hotkey Command Reference
                   </h2>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-950 text-blue-300 border border-blue-800">
-                    LOSM Operator Hotkeys
+                    Plurality Operator Hotkeys
                   </span>
                 </div>
                 <p className="text-xs text-gray-400">
-                  Press hotkeys anytime while operating NEXUS DUALITY to trigger actions instantly.
+                  Press hotkeys anytime while operating Plurality to trigger actions instantly.
                 </p>
               </div>
             </div>

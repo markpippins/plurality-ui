@@ -99,7 +99,7 @@ export function RoundtableModal() {
                     Agent Roundtable Consensus
                   </h2>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-950 text-blue-300 border border-blue-800">
-                    LOSM Protocol v2.4
+                    Plurality Protocol v2.4
                   </span>
                 </div>
                 <p className="text-xs text-gray-400">
@@ -213,7 +213,9 @@ export function RoundtableModal() {
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {activeAgents.map(agent => {
+                  {[...activeAgents]
+                    .sort((a, b) => a.role.localeCompare(b.role, undefined, { sensitivity: 'base' }))
+                    .map(agent => {
                     const isSelected = selectedParticipantIds.includes(agent.id);
                     return (
                       <button
@@ -294,7 +296,9 @@ export function RoundtableModal() {
 
                 {/* Agent Vote Cards Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {activeAgents.map((agent) => {
+                  {[...activeAgents]
+                    .sort((a, b) => a.role.localeCompare(b.role, undefined, { sensitivity: 'base' }))
+                    .map((agent) => {
                     const isParticipant = !roundtableSession.participantAgentIds || roundtableSession.participantAgentIds.includes(agent.id);
                     const agentVote = votes.find(v => v.agentId === agent.id);
                     const badge = agentVote ? getVoteBadge(agentVote.vote) : null;

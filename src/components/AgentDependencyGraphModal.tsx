@@ -37,7 +37,7 @@ export function AgentDependencyGraphModal() {
               </div>
               <div>
                 <h2 className="text-sm font-bold text-gray-100 uppercase tracking-wide">
-                  LOSM Agent Task Flow & Dependency Graph
+                  Plurality Agent Task Flow & Dependency Graph
                 </h2>
                 <p className="text-xs text-gray-400">
                   D3.js Directed Graph • Highlighting Active Task Streams & Waiting Bottlenecks

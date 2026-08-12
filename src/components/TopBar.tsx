@@ -1,18 +1,15 @@
-import React, { useState } from 'react';
-import { Settings, Network, Bell, Zap, Users, Vote, Sliders, Keyboard, Workflow } from 'lucide-react';
-import { AVAILABLE_PROVIDERS } from '../services/SimulatedBackendService';
+import React from 'react';
+import { Settings, Bell, Users, Sliders, Keyboard, Workflow, Shield, Moon, Sun, FileText } from 'lucide-react';
 import { useSimulation } from '../hooks/useSimulation';
+import { GlobalSearchBar } from './GlobalSearchBar';
+import { cn } from '../lib/utils';
 
 export function TopBar() {
   const { 
     addToast, toasts, openRoundtableModal, roundtableSession, 
-    openAgentConfigModal, openDependencyGraphModal, toggleShortcutsModal 
+    openAgentConfigModal, openDependencyGraphModal, openWorkRequestDetailModal, toggleShortcutsModal,
+    theme, setTheme
   } = useSimulation();
-  const [plannerProvider, setPlannerProvider] = useState(AVAILABLE_PROVIDERS[1]);
-  const [plannerModel, setPlannerModel] = useState(AVAILABLE_PROVIDERS[1].models[0]);
-  
-  const [coderProvider, setCoderProvider] = useState(AVAILABLE_PROVIDERS[0]);
-  const [coderModel, setCoderModel] = useState(AVAILABLE_PROVIDERS[0].models[0]);
 
   const handleTestNotification = () => {
     addToast({
@@ -30,15 +27,28 @@ export function TopBar() {
   const isVoting = roundtableSession?.status === 'voting';
 
   return (
-    <div className="h-14 border-b border-gray-800 bg-gray-900 flex items-center justify-between px-4 text-sm text-gray-300">
-      <div className="flex items-center space-x-2">
+    <div className="h-14 border-b border-gray-800 bg-gray-900 flex items-center justify-between px-4 text-sm text-gray-300 gap-2">
+      <div className="flex items-center space-x-2 shrink-0">
         <div className="w-8 h-8 rounded bg-blue-600 flex items-center justify-center text-white font-bold tracking-tighter shadow-sm">
-          NX
+          PL
         </div>
-        <span className="font-semibold text-gray-100 tracking-wide">NEXUS DUALITY <span className="text-gray-500 font-normal">LOSM Operator</span></span>
+        <span className="font-semibold text-gray-100 tracking-wide hidden xl:inline">PLURALITY <span className="text-gray-500 font-normal">Operator Surface</span></span>
       </div>
 
-      <div className="flex items-center space-x-3">
+      {/* Global Search Bar */}
+      <GlobalSearchBar />
+
+      <div className="flex items-center space-x-2 shrink-0">
+        {/* Work Request Detail Button */}
+        <button
+          onClick={() => openWorkRequestDetailModal()}
+          className="flex items-center space-x-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 px-2.5 py-1.5 rounded-md text-xs font-medium shadow-sm transition-all hover:text-white"
+          title="Open Work Request Detail Popup Window"
+        >
+          <FileText className="w-3.5 h-3.5 text-blue-400" />
+          <span className="hidden sm:inline">Request Detail</span>
+        </button>
+
         {/* D3 Dependency Graph Button */}
         <button
           onClick={() => openDependencyGraphModal()}
@@ -64,59 +74,54 @@ export function TopBar() {
             </span>
           ) : null}
         </button>
-
-        {/* Planner Actor Selector */}
-        <div className="flex items-center space-x-2 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
-          <Network className="w-4 h-4 text-purple-400" />
-          <span className="text-gray-400 text-xs uppercase tracking-wider">Planner Base</span>
-          <select 
-            className="bg-transparent text-gray-200 outline-none cursor-pointer"
-            value={plannerProvider.id}
-            onChange={(e) => {
-              const p = AVAILABLE_PROVIDERS.find(x => x.id === e.target.value)!;
-              setPlannerProvider(p);
-              setPlannerModel(p.models[0]);
-            }}
-          >
-            {AVAILABLE_PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          <span className="text-gray-600">/</span>
-          <select 
-            className="bg-transparent text-gray-200 outline-none cursor-pointer max-w-[120px] truncate"
-            value={plannerModel}
-            onChange={(e) => setPlannerModel(e.target.value)}
-          >
-            {plannerProvider.models.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </div>
-
-        {/* Builder Actor Selector */}
-        <div className="flex items-center space-x-2 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
-          <Network className="w-4 h-4 text-green-400" />
-          <span className="text-gray-400 text-xs uppercase tracking-wider">Coder Base</span>
-          <select 
-            className="bg-transparent text-gray-200 outline-none cursor-pointer"
-            value={coderProvider.id}
-            onChange={(e) => {
-              const p = AVAILABLE_PROVIDERS.find(x => x.id === e.target.value)!;
-              setCoderProvider(p);
-              setCoderModel(p.models[0]);
-            }}
-          >
-            {AVAILABLE_PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          <span className="text-gray-600">/</span>
-          <select 
-            className="bg-transparent text-gray-200 outline-none cursor-pointer max-w-[120px] truncate"
-            value={coderModel}
-            onChange={(e) => setCoderModel(e.target.value)}
-          >
-            {coderProvider.models.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </div>
       </div>
 
-      <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-2.5">
+        {/* Theme Toolbar Toggle */}
+        <div className="flex items-center bg-gray-950/80 p-0.5 rounded-lg border border-gray-800 shrink-0 shadow-inner">
+          <button
+            onClick={() => setTheme('steel')}
+            className={cn(
+              "flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium transition-all",
+              theme === 'steel'
+                ? "bg-blue-600/90 text-white font-semibold shadow-sm border border-blue-500/50"
+                : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
+            )}
+            title="Steel Theme (Cool slate & steel workspace atmosphere)"
+          >
+            <Shield className="w-3.5 h-3.5 text-blue-300" />
+            <span className="hidden sm:inline text-[11px]">Steel</span>
+          </button>
+
+          <button
+            onClick={() => setTheme('dark')}
+            className={cn(
+              "flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium transition-all",
+              theme === 'dark'
+                ? "bg-purple-600/90 text-white font-semibold shadow-sm border border-purple-500/50"
+                : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
+            )}
+            title="Obsidian Dark Theme (Deep pitch black workspace atmosphere)"
+          >
+            <Moon className="w-3.5 h-3.5 text-purple-300" />
+            <span className="hidden sm:inline text-[11px]">Dark</span>
+          </button>
+
+          <button
+            onClick={() => setTheme('light')}
+            className={cn(
+              "flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium transition-all",
+              theme === 'light'
+                ? "bg-amber-500 text-gray-950 font-bold shadow-sm border border-amber-400"
+                : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
+            )}
+            title="Light Theme (Clean high-contrast operational surface)"
+          >
+            <Sun className="w-3.5 h-3.5 text-amber-500" />
+            <span className="hidden sm:inline text-[11px]">Light</span>
+          </button>
+        </div>
+
         <button
           onClick={() => toggleShortcutsModal()}
           className="flex items-center space-x-1 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 px-2 py-1.5 rounded-md text-xs font-semibold transition-colors"

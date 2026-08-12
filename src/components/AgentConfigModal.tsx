@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSimulation } from '../hooks/useSimulation';
-import { AVAILABLE_PROVIDERS, AVATAR_PRESETS } from '../services/SimulatedBackendService';
+import { AVATAR_PRESETS } from '../services/SimulatedBackendService';
 import { ActiveAgent } from '../types';
 import { 
   X, Sliders, Cpu, Sparkles, RefreshCw, Check, 
@@ -14,7 +14,7 @@ const PROMPT_PRESETS: Record<string, Array<{ name: string; prompt: string }>> = 
   a1: [
     {
       name: 'Default Task Planner',
-      prompt: `You are the Lead Task Planner in the LOSM workflow. Your primary goal is to synthesize user intents into structured execution sequences, decompose goals into modular PlanIR steps, and estimate task dependencies and risk profiles.`
+      prompt: `You are the Lead Task Planner in the Plurality workflow. Your primary goal is to synthesize user intents into structured execution sequences, decompose goals into modular PlanIR steps, and estimate task dependencies and risk profiles.`
     },
     {
       name: 'Strict Milestone Sequencer',
@@ -24,7 +24,7 @@ const PROMPT_PRESETS: Record<string, Array<{ name: string; prompt: string }>> = 
   a5: [
     {
       name: 'Default System Architect',
-      prompt: `You are the Lead System Architect in the LOSM workflow. You design structural boundaries, define domain interfaces, specify module hierarchies, maintain clear file node schemas, and enforce decoupled design patterns.`
+      prompt: `You are the Lead System Architect in the Plurality workflow. You design structural boundaries, define domain interfaces, specify module hierarchies, maintain clear file node schemas, and enforce decoupled design patterns.`
     },
     {
       name: 'Enterprise Microservices Architect',
@@ -34,7 +34,7 @@ const PROMPT_PRESETS: Record<string, Array<{ name: string; prompt: string }>> = 
   a2: [
     {
       name: 'Default Reviewer',
-      prompt: `You are the Security & Integrity Reviewer in the LOSM workflow. You audit proposed PlanIR strategies and code outputs against OWASP safety, performance overhead, data destruction risk, and architectural integrity. Assign risk scores (1-100) and issue blocking critiques when critical vulnerabilities are identified.`
+      prompt: `You are the Security & Integrity Reviewer in the Plurality workflow. You audit proposed PlanIR strategies and code outputs against OWASP safety, performance overhead, data destruction risk, and architectural integrity. Assign risk scores (1-100) and issue blocking critiques when critical vulnerabilities are identified.`
     },
     {
       name: 'Zero-Trust OWASP Auditor',
@@ -44,7 +44,7 @@ const PROMPT_PRESETS: Record<string, Array<{ name: string; prompt: string }>> = 
   a3: [
     {
       name: 'Default Builder',
-      prompt: `You are the Lead Code Generation Engine in the LOSM workflow. Your role is to transform PlanIR specifications into production-grade TypeScript code, React UI components, and API route handlers.`
+      prompt: `You are the Lead Code Generation Engine in the Plurality workflow. Your role is to transform PlanIR specifications into production-grade TypeScript code, React UI components, and API route handlers.`
     },
     {
       name: 'Functional React & Tailwind Craftsman',
@@ -60,7 +60,7 @@ const PROMPT_PRESETS: Record<string, Array<{ name: string; prompt: string }>> = 
   a4: [
     {
       name: 'Default QA Validator',
-      prompt: `You are the Quality Assurance & Test Verification Agent in the LOSM workflow. Execute 3-tier assertion suites including Static AST Analysis, Unit Functionality, and E2E Integration tests.`
+      prompt: `You are the Quality Assurance & Test Verification Agent in the Plurality workflow. Execute 3-tier assertion suites including Static AST Analysis, Unit Functionality, and E2E Integration tests.`
     }
   ],
   a7: [
@@ -86,6 +86,26 @@ const PROMPT_PRESETS: Record<string, Array<{ name: string; prompt: string }>> = 
       name: 'Default Compliance Auditor',
       prompt: `You are the Governance & Compliance Auditor. You monitor activity logs, audit trail completeness, policy adherence, privacy bounds, and multi-agent coordination records.`
     }
+  ],
+  a11: [
+    {
+      name: 'Default Database Specialist',
+      prompt: `You are the Lead Database Administrator (DBA) in the Plurality workflow. Your primary role is to design relational & document schemas, optimize query plans, manage migration scripts, enforce transactional integrity, and oversee indexing and data persistence.`
+    },
+    {
+      name: 'High-Throughput SQL & NoSQL Architect',
+      prompt: `You are a High-Performance Database Specialist. Focus on query indexing strategies, connection pooling, sharding key selection, ACID consistency compliance, and schema migration safety.`
+    }
+  ],
+  a12: [
+    {
+      name: 'Default Network Topologist',
+      prompt: `You are the Network Topologist in the Plurality workflow. You analyze dependency structures, compute graph invariants, detect circular dependencies, map agent communication topology, and optimize cluster routing across multi-agent networks.`
+    },
+    {
+      name: 'Graph Clustering & Lattice Router',
+      prompt: `You are a Topological Graph Algorithms Expert. Optimize shortest-path communication channels between agents, compute DAG invariants, partition task clusters, and eliminate routing bottlenecks.`
+    }
   ]
 };
 
@@ -101,10 +121,19 @@ export function AgentConfigModal() {
   const [generationProgress, setGenerationProgress] = useState(0);
 
   // New Agent creation state
-  const [newAgentForm, setNewAgentForm] = useState({
+  const [newAgentForm, setNewAgentForm] = useState<{
+    name: string;
+    role: string;
+    flavor: 'leased' | 'harness';
+    systemPrompt: string;
+    temperature: number;
+    topP: number;
+    maxTokens: number;
+    avatarPrompt: string;
+  }>({
     name: '',
     role: '',
-    model: 'claude-3-5-sonnet',
+    flavor: 'leased',
     systemPrompt: '',
     temperature: 0.7,
     topP: 0.9,
@@ -126,7 +155,7 @@ export function AgentConfigModal() {
       setFormData({
         name: currentAgent.name,
         role: currentAgent.role,
-        model: currentAgent.model || 'claude-3-5-sonnet',
+        flavor: currentAgent.flavor || 'leased',
         systemPrompt: currentAgent.systemPrompt || '',
         temperature: currentAgent.temperature ?? 0.7,
         topP: currentAgent.topP ?? 0.9,
@@ -138,8 +167,6 @@ export function AgentConfigModal() {
   }, [currentAgent, activeTab, isCreatingNew]);
 
   if (!isAgentConfigOpen) return null;
-
-  const allModels = AVAILABLE_PROVIDERS.flatMap(p => p.models);
 
   const handleSave = () => {
     if (isCreatingNew) {
@@ -164,7 +191,7 @@ export function AgentConfigModal() {
     const created = addAgent({
       name: newAgentForm.name.trim(),
       role: newAgentForm.role.trim() || 'Specialist',
-      model: newAgentForm.model,
+      flavor: newAgentForm.flavor,
       systemPrompt: newAgentForm.systemPrompt || `You are ${newAgentForm.name}, an expert AI agent in the multi-agent system.`,
       temperature: newAgentForm.temperature,
       topP: newAgentForm.topP,
@@ -176,7 +203,7 @@ export function AgentConfigModal() {
     setNewAgentForm({
       name: '',
       role: '',
-      model: 'claude-3-5-sonnet',
+      flavor: 'leased',
       systemPrompt: '',
       temperature: 0.7,
       topP: 0.9,
@@ -264,7 +291,7 @@ export function AgentConfigModal() {
                     Agent Persona & Parameter Matrix
                   </h2>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800">
-                    LOSM Agent Config
+                    Plurality Agent Config
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/80 flex items-center space-x-1" title="Changes auto-persist to LocalStorage">
                     <HardDrive className="w-3 h-3 text-emerald-400" />
@@ -272,7 +299,7 @@ export function AgentConfigModal() {
                   </span>
                 </div>
                 <p className="text-xs text-gray-400">
-                  Configure system instructions, temperature creativity, model selection, and profile avatars per agent.
+                  Configure system instructions, role flavor (Leased / Harness), temperature creativity, and profile avatars per agent.
                 </p>
               </div>
             </div>
@@ -287,7 +314,9 @@ export function AgentConfigModal() {
 
           {/* Agent Switcher Tabs */}
           <div className="bg-gray-950/80 px-6 py-2 border-b border-gray-800 flex items-center space-x-2 shrink-0 overflow-x-auto">
-            {activeAgents.map((ag) => (
+            {[...activeAgents]
+              .sort((a, b) => a.role.localeCompare(b.role, undefined, { sensitivity: 'base' }))
+              .map((ag) => (
               <button
                 key={ag.id}
                 onClick={() => setActiveTab(ag.id)}
@@ -391,18 +420,38 @@ export function AgentConfigModal() {
                 <div className="space-y-5 bg-gray-950/50 p-4 rounded-xl border border-gray-800/80">
                   <div className="space-y-4">
                     <div>
-                      <label className="text-xs font-semibold text-gray-300 block mb-1">
-                        Primary AI Foundation Model
+                      <label className="text-xs font-semibold text-gray-300 block mb-1.5">
+                        Role Flavor
                       </label>
-                      <select
-                        value={newAgentForm.model}
-                        onChange={e => setNewAgentForm({ ...newAgentForm, model: e.target.value })}
-                        className="w-full bg-gray-900 border border-gray-800 rounded-lg p-2.5 text-xs text-gray-200 focus:outline-none focus:border-emerald-500"
-                      >
-                        {allModels.map(m => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNewAgentForm({ ...newAgentForm, flavor: 'leased' })}
+                          className={cn(
+                            "px-3 py-2 rounded-lg text-xs font-semibold border flex flex-col items-center justify-center transition-all",
+                            newAgentForm.flavor === 'leased'
+                              ? "bg-emerald-950 text-emerald-200 border-emerald-500 shadow-sm"
+                              : "bg-gray-900 text-gray-400 border-gray-800 hover:text-gray-200"
+                          )}
+                        >
+                          <span className="font-bold">Leased Role</span>
+                          <span className="text-[9px] text-emerald-400/80 font-normal">Ephemeral</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setNewAgentForm({ ...newAgentForm, flavor: 'harness' })}
+                          className={cn(
+                            "px-3 py-2 rounded-lg text-xs font-semibold border flex flex-col items-center justify-center transition-all",
+                            newAgentForm.flavor === 'harness'
+                              ? "bg-amber-950 text-amber-200 border-amber-500 shadow-sm"
+                              : "bg-gray-900 text-gray-400 border-gray-800 hover:text-gray-200"
+                          )}
+                        >
+                          <span className="font-bold">Harness Role</span>
+                          <span className="text-[9px] text-amber-400/80 font-normal">Persistent</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div>
@@ -501,22 +550,43 @@ export function AgentConfigModal() {
                     </div>
                   </div>
 
-                  {/* Model & Token Limits */}
+                  {/* Role Flavor & Token Limits */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-950/50 p-4 rounded-lg border border-gray-800/80">
-                    {/* Model Selector */}
+                    {/* Role Flavor Selector */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-gray-400 block">
-                        LLM Engine Model
+                      <label className="text-xs font-semibold text-gray-300 block flex items-center justify-between">
+                        <span>Role Flavor</span>
+                        <span className="text-[10px] text-gray-500 font-mono">Runtime Control</span>
                       </label>
-                      <select
-                        value={formData.model || 'claude-3-5-sonnet'}
-                        onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                        className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-purple-500 font-mono"
-                      >
-                        {allModels.map((m) => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, flavor: 'leased' })}
+                          className={cn(
+                            "px-3 py-2 rounded-md text-xs font-semibold border flex flex-col items-center justify-center transition-all",
+                            (formData.flavor || 'leased') === 'leased'
+                              ? "bg-blue-950/90 text-blue-200 border-blue-500 shadow-sm"
+                              : "bg-gray-900 text-gray-400 border-gray-800 hover:text-gray-200 hover:bg-gray-800"
+                          )}
+                        >
+                          <span className="font-bold">Leased Role</span>
+                          <span className="text-[9px] font-normal text-blue-300/80">Ephemeral / On-Demand</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, flavor: 'harness' })}
+                          className={cn(
+                            "px-3 py-2 rounded-md text-xs font-semibold border flex flex-col items-center justify-center transition-all",
+                            formData.flavor === 'harness'
+                              ? "bg-amber-950/90 text-amber-200 border-amber-500 shadow-sm"
+                              : "bg-gray-900 text-gray-400 border-gray-800 hover:text-gray-200 hover:bg-gray-800"
+                          )}
+                        >
+                          <span className="font-bold">Harness Role</span>
+                          <span className="text-[9px] font-normal text-amber-300/80">Persistent / Anchored</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Max Tokens */}
@@ -689,7 +759,7 @@ export function AgentConfigModal() {
                   // Reset current form to default
                   const preset = (PROMPT_PRESETS[currentAgent.id] || [])[0];
                   setFormData({
-                    model: 'claude-3-5-sonnet',
+                    flavor: currentAgent.flavor || 'leased',
                     systemPrompt: preset?.prompt || '',
                     temperature: 0.7,
                     topP: 0.9,

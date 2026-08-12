@@ -1,8 +1,8 @@
 import { BehaviorSubject, Subject, delay, of, tap } from 'rxjs';
 import { 
   Workspace, FileNode, ChatMessage, AgentLog, ProviderConfig,
-  WorkRequest, PlanIR, CritiqueIR, SpecIR, ExecutionIR, ValidationIR, AppState, ActiveAgent, AgentLogEntry, ToastNotification,
-  AgentVote, RoundtableSession
+  WorkRequest, WorkRequestDetail, buildDefaultWorkRequestDetail, PlanIR, CritiqueIR, SpecIR, ExecutionIR, ValidationIR, AppState, ActiveAgent, AgentLogEntry, ToastNotification,
+  AgentVote, RoundtableSession, AppTheme
 } from '../types';
 
 import avatarPlanner from '../assets/images/avatar_planner_1786461702771.jpg';
@@ -26,10 +26,29 @@ export const AVATAR_PRESETS: Record<string, string[]> = {
   a8: [avatarValidatorAlt, avatarValidator],
   a9: [avatarPlanner, avatarCriticAlt],
   a10: [avatarCritic, avatarValidatorAlt],
+  a11: [avatarCoderAlt, avatarValidator],
+  a12: [avatarPlannerAlt, avatarCriticAlt],
 };
 
-const STORAGE_KEY_AGENTS = 'nexus_duality_agent_configs_v1';
-const STORAGE_KEY_LOGS = 'nexus_duality_agent_logs_v1';
+const STORAGE_KEY_AGENTS = 'plurality_agent_configs_v1';
+const STORAGE_KEY_LOGS = 'plurality_agent_logs_v1';
+const STORAGE_KEY_THEME = 'plurality_theme_v1';
+
+function loadPersistedTheme(): AppTheme {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_THEME);
+    if (saved === 'steel' || saved === 'dark' || saved === 'light') {
+      return saved;
+    }
+  } catch (e) {
+    console.warn('Failed to load persisted theme', e);
+  }
+  return 'steel';
+}
+
+export function sortAgentsByRole(agents: ActiveAgent[]): ActiveAgent[] {
+  return [...agents].sort((a, b) => a.role.localeCompare(b.role, undefined, { sensitivity: 'base' }));
+}
 
 function loadPersistedAgents(): ActiveAgent[] {
   try {
@@ -54,13 +73,13 @@ function loadPersistedAgents(): ActiveAgent[] {
             status: 'idle' as const,
             lastActive: p.lastActive ? new Date(p.lastActive) : new Date()
           }));
-        return [...mergedDefaults, ...customAgents];
+        return sortAgentsByRole([...mergedDefaults, ...customAgents]);
       }
     }
   } catch (err) {
     console.warn('Failed to load agent configs from localStorage:', err);
   }
-  return MOCK_ACTIVE_AGENTS;
+  return sortAgentsByRole(MOCK_ACTIVE_AGENTS);
 }
 
 function loadPersistedLogs(): AgentLogEntry[] {
@@ -100,8 +119,131 @@ function savePersistedLogs(logs: AgentLogEntry[]) {
 
 // Initial Mock Data
 const MOCK_WORK_REQUESTS: WorkRequest[] = [
-  { id: 'wr-1', intent: 'Build an E-commerce API', status: 'NEW', created_at: new Date(Date.now() - 3600000) },
-  { id: 'wr-2', intent: 'Implement a React IDE', status: 'PLAN', created_at: new Date() },
+  {
+    id: 'wr-0133-1781805090',
+    intent: 'Test opencode harness + ollama provider combo for qwen2.5-coder',
+    status: 'PLAN',
+    created_at: new Date('2026-06-18T13:51:30.324Z'),
+    detail: {
+      id: "wr-0133-1781805090",
+      version: 1,
+      intent: {
+        problem_statement: "Test opencode harness + ollama provider combo for qwen2.5-coder. Write /tmp/pipeline-test-0133.txt identifying which model ran.",
+        desired_outcome: "Model chain test: opencode + ollama combo",
+        domain: "nexus",
+        priority: "medium",
+        user_intent_trace: "0086",
+        abstraction_level: "task"
+      },
+      decomposition: {
+        strategy: "Direct implementation of plan steps",
+        steps: [
+          {
+            step_id: "step_1",
+            description: "Plan 0133: Model chain test: opencode + ollama combo\n\nGoal: Test opencode harness + ollama provider combo for qwen2.5-coder. Write /tmp/pipeline-test-0133.txt identifying which model ran.\n\nContent: \n\nAcceptance criteria:\n- Verify model chain execution\n- Output text written to /tmp/pipeline-test-0133.txt",
+            dependencies: [],
+            outputs: [
+              "changes_committed"
+            ],
+            type: "execution"
+          }
+        ],
+        parallelism_model: "sequential",
+        recursion_allowed: false
+      },
+      requirements: {
+        functional: ["Execute model chain test for qwen2.5-coder", "Generate model verification file at /tmp/pipeline-test-0133.txt"],
+        non_functional: ["Deterministic response timing", "Non-blocking execution"],
+        system_requirements: ["Linux container with opencode harness"],
+        tool_requirements: ["ollama provider", "qwen2.5-coder:latest"]
+      },
+      constraints: {
+        forbidden_actions: ["Do not delete or overwrite historical plan artifacts"],
+        safety_constraints: [
+          "Do not delete or overwrite historical plan artifacts",
+          "Do not modify .conduit-data/ directory structure",
+          "Preserve existing receipt and audit records",
+          "Follow existing project conventions when editing code"
+        ],
+        resource_limits: null,
+        architectural_constraints: ["Operate within /home/codex/dev/nexus boundary"]
+      },
+      success_criteria: {
+        validation_rules: ["Verify /tmp/pipeline-test-0133.txt exists", "Check model identifier string in execution log"],
+        acceptance_tests: ["Run automated harness integration check"],
+        completion_conditions: ["Outputs match changes_committed"],
+        failure_modes: [
+          "Files affected list does not match actual changes",
+          "Acceptance criteria not satisfied",
+          "Typecheck or tests fail"
+        ]
+      },
+      execution_state: {
+        status: "pending",
+        current_step: "step_1",
+        progress: 0.0,
+        retries: 0,
+        error_state: null,
+        context_snapshot_ref: null,
+        last_updated: "2026-06-18T13:51:30.324165Z"
+      },
+      lineage: {
+        derived_from: [
+          "0133"
+        ],
+        supersedes: null,
+        branches: [],
+        merge_history: []
+      },
+      artifacts: {
+        produced_files: ["/tmp/pipeline-test-0133.txt"],
+        intermediate_outputs: ["plan_ir_0133.json"]
+      },
+      metadata: {
+        created_at: "2026-06-18T13:51:30.324165Z",
+        updated_at: "2026-06-18T13:51:30.324165Z",
+        agent_id: "conduit",
+        mode: "default",
+        tags: [
+          "plan-migration",
+          "builder"
+        ],
+        role: "builder",
+        harness: "opencode",
+        model: "qwen2.5-coder:latest",
+        session_id: "builder-20260618-135128"
+      },
+      path: "/home/codex/dev/nexus"
+    }
+  },
+  { 
+    id: 'wr-1', 
+    intent: 'Build an E-commerce API', 
+    status: 'NEW', 
+    created_at: new Date(Date.now() - 3600000),
+    detail: buildDefaultWorkRequestDetail('wr-1', 'Build an E-commerce API', 'NEW')
+  },
+  { 
+    id: 'wr-2', 
+    intent: 'Implement a React IDE', 
+    status: 'PLAN', 
+    created_at: new Date(Date.now() - 1800000),
+    detail: buildDefaultWorkRequestDetail('wr-2', 'Implement a React IDE', 'PLAN')
+  },
+  { 
+    id: 'wr-3', 
+    intent: 'Refactor Authentication Pipeline', 
+    status: 'VALIDATE', 
+    created_at: new Date(Date.now() - 7200000),
+    detail: buildDefaultWorkRequestDetail('wr-3', 'Refactor Authentication Pipeline', 'VALIDATE')
+  },
+  { 
+    id: 'wr-4', 
+    intent: 'Migrate Legacy Database Schemas', 
+    status: 'FAILED', 
+    created_at: new Date(Date.now() - 5400000),
+    detail: buildDefaultWorkRequestDetail('wr-4', 'Migrate Legacy Database Schemas', 'FAILED')
+  },
 ];
 
 const INITIAL_FILE_TREE: FileNode[] = [
@@ -128,10 +270,11 @@ const MOCK_ACTIVE_AGENTS: ActiveAgent[] = [
     name: 'Planner', 
     role: 'Planner', 
     status: 'idle', 
+    flavor: 'harness',
     model: 'claude-3-5-sonnet', 
     lastActive: new Date(Date.now() - 300000), 
     avatarUrl: avatarPlanner,
-    systemPrompt: `You are the Lead Task Planner in the LOSM workflow. Your primary goal is to synthesize user intents into structured execution sequences, decompose goals into modular PlanIR steps, and estimate task dependencies and risk profiles.`,
+    systemPrompt: `You are the Lead Task Planner in the Plurality workflow. Your primary goal is to synthesize user intents into structured execution sequences, decompose goals into modular PlanIR steps, and estimate task dependencies and risk profiles.`,
     temperature: 0.70,
     topP: 0.90,
     maxTokens: 4096,
@@ -142,10 +285,11 @@ const MOCK_ACTIVE_AGENTS: ActiveAgent[] = [
     name: 'Architect', 
     role: 'System Architect', 
     status: 'idle', 
+    flavor: 'harness',
     model: 'claude-3-5-sonnet', 
     lastActive: new Date(Date.now() - 280000), 
     avatarUrl: avatarPlannerAlt,
-    systemPrompt: `You are the Lead System Architect in the LOSM workflow. You design structural boundaries, define domain interfaces, specify module hierarchies, maintain clear file node schemas, and enforce decoupled design patterns.`,
+    systemPrompt: `You are the Lead System Architect in the Plurality workflow. You design structural boundaries, define domain interfaces, specify module hierarchies, maintain clear file node schemas, and enforce decoupled design patterns.`,
     temperature: 0.60,
     topP: 0.85,
     maxTokens: 4096,
@@ -156,10 +300,11 @@ const MOCK_ACTIVE_AGENTS: ActiveAgent[] = [
     name: 'Critic', 
     role: 'Reviewer', 
     status: 'idle', 
+    flavor: 'harness',
     model: 'gpt-4o', 
     lastActive: new Date(Date.now() - 240000), 
     avatarUrl: avatarCritic,
-    systemPrompt: `You are the Security & Integrity Reviewer in the LOSM workflow. You audit proposed PlanIR strategies and code outputs against OWASP safety, performance overhead, data destruction risk, and architectural integrity. Assign risk scores (1-100) and issue blocking critiques when critical vulnerabilities are identified.`,
+    systemPrompt: `You are the Security & Integrity Reviewer in the Plurality workflow. You audit proposed PlanIR strategies and code outputs against OWASP safety, performance overhead, data destruction risk, and architectural integrity. Assign risk scores (1-100) and issue blocking critiques when critical vulnerabilities are identified.`,
     temperature: 0.20,
     topP: 0.30,
     maxTokens: 2048,
@@ -170,10 +315,11 @@ const MOCK_ACTIVE_AGENTS: ActiveAgent[] = [
     name: 'Coder', 
     role: 'Builder', 
     status: 'idle', 
+    flavor: 'leased',
     model: 'gpt-4o', 
     lastActive: new Date(Date.now() - 120000), 
     avatarUrl: avatarCoder,
-    systemPrompt: `You are the Lead Code Generation Engine in the LOSM workflow. Your role is to transform PlanIR specifications into production-grade TypeScript code, React UI components, and API route handlers. Always include complete typing, proper error handling, robust state managers, and responsive Tailwind styling.`,
+    systemPrompt: `You are the Lead Code Generation Engine in the Plurality workflow. Your role is to transform PlanIR specifications into production-grade TypeScript code, React UI components, and API route handlers. Always include complete typing, proper error handling, robust state managers, and responsive Tailwind styling.`,
     temperature: 0.50,
     topP: 0.80,
     maxTokens: 8192,
@@ -184,6 +330,7 @@ const MOCK_ACTIVE_AGENTS: ActiveAgent[] = [
     name: 'Engineer', 
     role: 'Engineering Lead', 
     status: 'idle', 
+    flavor: 'leased',
     model: 'gpt-4o-mini', 
     lastActive: new Date(Date.now() - 100000), 
     avatarUrl: avatarCoderAlt,
@@ -198,10 +345,11 @@ const MOCK_ACTIVE_AGENTS: ActiveAgent[] = [
     name: 'Validator', 
     role: 'QA', 
     status: 'idle', 
+    flavor: 'leased',
     model: 'gemini-1.5-pro', 
     lastActive: new Date(Date.now() - 60000), 
     avatarUrl: avatarValidator,
-    systemPrompt: `You are the Quality Assurance & Test Verification Agent in the LOSM workflow. Execute 3-tier assertion suites including Static AST Analysis, Unit Functionality, and E2E Integration tests. Verify contract compliance against original user intent and produce deterministic pass/fail reports.`,
+    systemPrompt: `You are the Quality Assurance & Test Verification Agent in the Plurality workflow. Execute 3-tier assertion suites including Static AST Analysis, Unit Functionality, and E2E Integration tests. Verify contract compliance against original user intent and produce deterministic pass/fail reports.`,
     temperature: 0.10,
     topP: 0.20,
     maxTokens: 2048,
@@ -212,6 +360,7 @@ const MOCK_ACTIVE_AGENTS: ActiveAgent[] = [
     name: 'Analyst', 
     role: 'Requirements Analyst', 
     status: 'idle', 
+    flavor: 'leased',
     model: 'gemini-1.5-pro', 
     lastActive: new Date(Date.now() - 50000), 
     avatarUrl: avatarCriticAlt,
@@ -226,6 +375,7 @@ const MOCK_ACTIVE_AGENTS: ActiveAgent[] = [
     name: 'Ontologist', 
     role: 'Knowledge Specialist', 
     status: 'idle', 
+    flavor: 'leased',
     model: 'claude-3-opus', 
     lastActive: new Date(Date.now() - 40000), 
     avatarUrl: avatarValidatorAlt,
@@ -240,6 +390,7 @@ const MOCK_ACTIVE_AGENTS: ActiveAgent[] = [
     name: 'Epistemologist', 
     role: 'Truth & Reasoning Auditor', 
     status: 'idle', 
+    flavor: 'harness',
     model: 'o1-preview', 
     lastActive: new Date(Date.now() - 30000), 
     avatarUrl: avatarPlanner,
@@ -254,6 +405,7 @@ const MOCK_ACTIVE_AGENTS: ActiveAgent[] = [
     name: 'Auditor', 
     role: 'Compliance Auditor', 
     status: 'idle', 
+    flavor: 'harness',
     model: 'gpt-4o', 
     lastActive: new Date(Date.now() - 20000), 
     avatarUrl: avatarCritic,
@@ -262,98 +414,185 @@ const MOCK_ACTIVE_AGENTS: ActiveAgent[] = [
     topP: 0.40,
     maxTokens: 4096,
     avatarPrompt: 'Futuristic governance auditor avatar portrait, minimalist 3D render, glowing silver crest shield'
+  },
+  { 
+    id: 'a11', 
+    name: 'DBA', 
+    role: 'Database Specialist', 
+    status: 'idle', 
+    flavor: 'leased',
+    model: 'gpt-4o', 
+    lastActive: new Date(Date.now() - 15000), 
+    avatarUrl: avatarCoderAlt,
+    systemPrompt: `You are the Lead Database Administrator (DBA) in the Plurality workflow. Your primary role is to design relational & document schemas, optimize query plans, manage migration scripts, enforce transactional integrity, and oversee indexing and data persistence.`,
+    temperature: 0.30,
+    topP: 0.60,
+    maxTokens: 4096,
+    avatarPrompt: 'Futuristic database administrator avatar portrait, minimalist 3D render, glowing metallic storage cylinders and SQL query nodes'
+  },
+  { 
+    id: 'a12', 
+    name: 'Topologist', 
+    role: 'Network Topologist', 
+    status: 'idle', 
+    flavor: 'harness',
+    model: 'claude-3-5-sonnet', 
+    lastActive: new Date(Date.now() - 10000), 
+    avatarUrl: avatarPlannerAlt,
+    systemPrompt: `You are the Network Topologist in the Plurality workflow. You analyze dependency structures, compute graph invariants, detect circular dependencies, map agent communication topology, and optimize cluster routing across multi-agent networks.`,
+    temperature: 0.40,
+    topP: 0.70,
+    maxTokens: 4096,
+    avatarPrompt: 'Futuristic network topologist avatar portrait, minimalist 3D render, glowing geometric web mesh and high-dimensional graph lattice'
   }
 ];
 
-const INITIAL_AGENT_LOGS: AgentLogEntry[] = [
-  {
-    id: 'log-101',
-    agentId: 'a1',
-    agentName: 'Planner',
-    timestamp: new Date(Date.now() - 300000),
-    level: 'info',
-    action: 'INITIALIZE_ACTOR',
-    details: 'Planner actor initialized with System Prompt [LOSM-Planner-v1] and model [claude-3-5-sonnet].',
-    metadata: { provider: 'Anthropic', maxTokens: 4096 }
-  },
-  {
-    id: 'log-102',
-    agentId: 'a1',
-    agentName: 'Planner',
-    timestamp: new Date(Date.now() - 290000),
-    level: 'info',
-    action: 'PARSE_INTENT',
-    details: 'Received WorkRequest [wr-2]: "Implement a React IDE". Parsed goals, dependencies, and constraints.',
-    metadata: { intentLength: 21, constraintsCount: 2 }
-  },
-  {
-    id: 'log-103',
-    agentId: 'a1',
-    agentName: 'Planner',
-    timestamp: new Date(Date.now() - 280000),
-    level: 'success',
-    action: 'EMIT_PLAN_IR',
-    details: 'Generated PlanIR with 2 execution steps (s1: Scaffold Components, s2: Wire State) and 1 risk factor.',
-    metadata: { stepsCount: 2, riskScore: 0.25 }
-  },
-  {
-    id: 'log-201',
-    agentId: 'a2',
-    agentName: 'Critic',
-    timestamp: new Date(Date.now() - 240000),
-    level: 'info',
-    action: 'INITIALIZE_ACTOR',
-    details: 'Critic actor loaded. Subscribed to PlanIR review channel.',
-  },
-  {
-    id: 'log-202',
-    agentId: 'a2',
-    agentName: 'Critic',
-    timestamp: new Date(Date.now() - 230000),
-    level: 'warn',
-    action: 'EVALUATE_PLAN_IR',
-    details: 'Critique complete. Identified 1 potential edge case: "Ensure components have Error Boundaries". Risk Score: 0.2.',
-    metadata: { recommendation: 'approve', severity: 'low' }
-  },
-  {
-    id: 'log-301',
-    agentId: 'a3',
-    agentName: 'Coder',
-    timestamp: new Date(Date.now() - 120000),
-    level: 'info',
-    action: 'INITIALIZE_ACTOR',
-    details: 'Coder actor ready. Waiting for SpecIR artifact generation.',
-  },
-  {
-    id: 'log-302',
-    agentId: 'a3',
-    agentName: 'Coder',
-    timestamp: new Date(Date.now() - 110000),
-    level: 'success',
-    action: 'WORKSPACE_MUTATION',
-    details: 'Synthesized file nodes and generated NewComponent.tsx in src/ directory.',
-    metadata: { createdFiles: ['src/NewComponent.tsx'], loc: 42 }
-  },
-  {
-    id: 'log-401',
-    agentId: 'a4',
-    agentName: 'Validator',
-    timestamp: new Date(Date.now() - 60000),
-    level: 'info',
-    action: 'RUN_VALIDATION_SUITE',
-    details: 'Executing 3-tier validation: Intent Alignment, Rule Compliance, Code Correctness.',
-  },
-  {
-    id: 'log-402',
-    agentId: 'a4',
-    agentName: 'Validator',
-    timestamp: new Date(Date.now() - 50000),
-    level: 'success',
-    action: 'VALIDATION_PASSED',
-    details: 'All validation criteria passed. Intent Alignment: 98%, Compliance: 100%, Correctness: 100%.',
-    metadata: { score: 0.99, recommendation: 'complete' }
+function generateHistoricalSeedLogs(): AgentLogEntry[] {
+  const baseLogs: AgentLogEntry[] = [
+    {
+      id: 'log-101',
+      agentId: 'a1',
+      agentName: 'Planner',
+      timestamp: new Date(Date.now() - 300000),
+      level: 'info',
+      action: 'INITIALIZE_ACTOR',
+      details: 'Planner actor initialized with System Prompt [Plurality-Planner-v1] and model [claude-3-5-sonnet].',
+      metadata: { provider: 'Anthropic', maxTokens: 4096 }
+    },
+    {
+      id: 'log-102',
+      agentId: 'a1',
+      agentName: 'Planner',
+      timestamp: new Date(Date.now() - 290000),
+      level: 'info',
+      action: 'PARSE_INTENT',
+      details: 'Received WorkRequest [wr-2]: "Implement a React IDE". Parsed goals, dependencies, and constraints.',
+      metadata: { intentLength: 21, constraintsCount: 2 }
+    },
+    {
+      id: 'log-103',
+      agentId: 'a1',
+      agentName: 'Planner',
+      timestamp: new Date(Date.now() - 280000),
+      level: 'success',
+      action: 'EMIT_PLAN_IR',
+      details: 'Generated PlanIR with 2 execution steps (s1: Scaffold Components, s2: Wire State) and 1 risk factor.',
+      metadata: { stepsCount: 2, riskScore: 0.25 }
+    },
+    {
+      id: 'log-201',
+      agentId: 'a2',
+      agentName: 'Critic',
+      timestamp: new Date(Date.now() - 240000),
+      level: 'info',
+      action: 'INITIALIZE_ACTOR',
+      details: 'Critic actor loaded. Subscribed to PlanIR review channel.',
+    },
+    {
+      id: 'log-202',
+      agentId: 'a2',
+      agentName: 'Critic',
+      timestamp: new Date(Date.now() - 230000),
+      level: 'warn',
+      action: 'EVALUATE_PLAN_IR',
+      details: 'Critique complete. Identified 1 potential edge case: "Ensure components have Error Boundaries". Risk Score: 0.2.',
+      metadata: { recommendation: 'approve', severity: 'low' }
+    },
+    {
+      id: 'log-301',
+      agentId: 'a3',
+      agentName: 'Coder',
+      timestamp: new Date(Date.now() - 120000),
+      level: 'info',
+      action: 'INITIALIZE_ACTOR',
+      details: 'Coder actor ready. Waiting for SpecIR artifact generation.',
+    },
+    {
+      id: 'log-302',
+      agentId: 'a3',
+      agentName: 'Coder',
+      timestamp: new Date(Date.now() - 110000),
+      level: 'success',
+      action: 'WORKSPACE_MUTATION',
+      details: 'Synthesized file nodes and generated NewComponent.tsx in src/ directory.',
+      metadata: { createdFiles: ['src/NewComponent.tsx'], loc: 42 }
+    },
+    {
+      id: 'log-401',
+      agentId: 'a4',
+      agentName: 'Validator',
+      timestamp: new Date(Date.now() - 60000),
+      level: 'info',
+      action: 'RUN_VALIDATION_SUITE',
+      details: 'Executing 3-tier validation: Intent Alignment, Rule Compliance, Code Correctness.',
+    },
+    {
+      id: 'log-402',
+      agentId: 'a4',
+      agentName: 'Validator',
+      timestamp: new Date(Date.now() - 50000),
+      level: 'success',
+      action: 'VALIDATION_PASSED',
+      details: 'All validation criteria passed. Intent Alignment: 98%, Compliance: 100%, Correctness: 100%.',
+      metadata: { score: 0.99, recommendation: 'complete' }
+    }
+  ];
+
+  const agents = [
+    { id: 'a1', name: 'Planner' },
+    { id: 'a5', name: 'Architect' },
+    { id: 'a2', name: 'Critic' },
+    { id: 'a3', name: 'Coder' },
+    { id: 'a4', name: 'Validator' },
+    { id: 'a7', name: 'Analyst' },
+    { id: 'a8', name: 'Ontologist' },
+    { id: 'a9', name: 'Epistemologist' },
+    { id: 'a10', name: 'Auditor' },
+    { id: 'a11', name: 'DBA' },
+    { id: 'a12', name: 'Topologist' },
+  ];
+
+  const actions = [
+    { action: 'SYNTHESIZE_SPEC', level: 'info' as const, template: 'Synthesized specification constraints and model bounds.' },
+    { action: 'EXECUTE_STEP', level: 'success' as const, template: 'Executed pipeline step with 0 type errors.' },
+    { action: 'AUDIT_POLICY', level: 'info' as const, template: 'Verified safety policy boundaries against OWASP framework.' },
+    { action: 'OPTIMIZE_SCHEMA', level: 'success' as const, template: 'Optimized index constraints and query plan.' },
+    { action: 'DETECT_LATENCY_SPIKE', level: 'warn' as const, template: 'Sub-agent response time exceeded 450ms target threshold.' },
+    { action: 'VALIDATE_CONTRACT', level: 'success' as const, template: 'Typecheck and contract verification succeeded.' },
+    { action: 'RETRY_SUBTASK', level: 'warn' as const, template: 'Transient API rate limit encountered. Retried attempt #1.' },
+    { action: 'CHECK_EPHEMERAL_STATE', level: 'info' as const, template: 'Checked memory snapshot integrity across cluster nodes.' },
+  ];
+
+  let logCounter = 1000;
+  for (let dayOffset = 1; dayOffset <= 6; dayOffset++) {
+    const logsTodayCount = Math.floor(Math.abs(Math.sin(dayOffset * 1.8)) * 5) + 6;
+    for (let i = 0; i < logsTodayCount; i++) {
+      const agent = agents[(dayOffset * 3 + i) % agents.length];
+      const act = actions[(i + dayOffset) % actions.length];
+      const hourOffset = (i * 3 + dayOffset * 2) % 24;
+      const minuteOffset = (i * 19) % 60;
+
+      const logDate = new Date();
+      logDate.setDate(logDate.getDate() - dayOffset);
+      logDate.setHours(hourOffset, minuteOffset, 0, 0);
+
+      baseLogs.push({
+        id: `log-hist-${logCounter++}`,
+        agentId: agent.id,
+        agentName: agent.name,
+        timestamp: logDate,
+        level: act.level,
+        action: act.action,
+        details: `${act.template} (Historical Execution)`,
+        metadata: { dayOffset, hour: hourOffset, synthetic: true }
+      });
+    }
   }
-];
+
+  return baseLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+}
+
+const INITIAL_AGENT_LOGS: AgentLogEntry[] = generateHistoricalSeedLogs();
 
 export class SimulatedBackendService {
   // Legacy Streams
@@ -374,7 +613,7 @@ export class SimulatedBackendService {
 
   public terminalOutput$ = new Subject<string>();
 
-  // LOSM Streams
+  // Plurality Streams
   private workRequestsSubject = new BehaviorSubject<WorkRequest[]>(MOCK_WORK_REQUESTS);
   public workRequests$ = this.workRequestsSubject.asObservable();
 
@@ -435,6 +674,54 @@ export class SimulatedBackendService {
   private isShortcutsOpenSubject = new BehaviorSubject<boolean>(false);
   public isShortcutsOpen$ = this.isShortcutsOpenSubject.asObservable();
 
+  private isWorkRequestDetailOpenSubject = new BehaviorSubject<boolean>(false);
+  public isWorkRequestDetailOpen$ = this.isWorkRequestDetailOpenSubject.asObservable();
+
+  private selectedWorkRequestForDetailSubject = new BehaviorSubject<WorkRequest | null>(null);
+  public selectedWorkRequestForDetail$ = this.selectedWorkRequestForDetailSubject.asObservable();
+
+  public openWorkRequestDetailModal(wr?: WorkRequest) {
+    const target = wr || this.activeWorkRequestSubject.getValue() || this.workRequestsSubject.getValue()[0];
+    if (target) {
+      this.selectedWorkRequestForDetailSubject.next(target);
+      this.isWorkRequestDetailOpenSubject.next(true);
+    }
+  }
+
+  public closeWorkRequestDetailModal() {
+    this.isWorkRequestDetailOpenSubject.next(false);
+  }
+
+  public toggleWorkRequestDetailModal(wr?: WorkRequest) {
+    const current = this.isWorkRequestDetailOpenSubject.getValue();
+    if (current) {
+      this.closeWorkRequestDetailModal();
+    } else {
+      this.openWorkRequestDetailModal(wr);
+    }
+  }
+
+  private themeSubject = new BehaviorSubject<AppTheme>(loadPersistedTheme());
+  public theme$ = this.themeSubject.asObservable();
+
+  constructor() {
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', this.themeSubject.getValue());
+    }
+  }
+
+  public setTheme(theme: AppTheme) {
+    this.themeSubject.next(theme);
+    try {
+      localStorage.setItem(STORAGE_KEY_THEME, theme);
+    } catch (e) {
+      console.warn('Failed to persist theme', e);
+    }
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  }
+
   public openShortcutsModal() {
     this.isShortcutsOpenSubject.next(true);
   }
@@ -467,7 +754,7 @@ export class SimulatedBackendService {
     if (idx !== -1) {
       const updatedAgent = { ...agents[idx], ...updates };
       agents[idx] = updatedAgent;
-      const updatedList = [...agents];
+      const updatedList = sortAgentsByRole([...agents]);
       this.activeAgentsSubject.next(updatedList);
       savePersistedAgents(updatedList);
 
@@ -495,7 +782,7 @@ export class SimulatedBackendService {
     try {
       localStorage.removeItem(STORAGE_KEY_AGENTS);
       localStorage.removeItem(STORAGE_KEY_LOGS);
-      this.activeAgentsSubject.next(MOCK_ACTIVE_AGENTS);
+      this.activeAgentsSubject.next(sortAgentsByRole(MOCK_ACTIVE_AGENTS));
       this.agentLogsSubject.next(INITIAL_AGENT_LOGS);
       this.addToast({
         title: '🔄 Storage Reset',
@@ -690,7 +977,7 @@ export class SimulatedBackendService {
     this.architectChatSubject.next([...current, userMsg]);
     
     setTimeout(() => {
-      const botMsg: ChatMessage = { id: `msg-bot-${Date.now()}`, role: 'architect', content: `Understood: "${msg}". Processing within LOSM orchestration pipeline.`, timestamp: new Date() };
+      const botMsg: ChatMessage = { id: `msg-bot-${Date.now()}`, role: 'architect', content: `Understood: "${msg}". Processing within Plurality orchestration pipeline.`, timestamp: new Date() };
       this.architectChatSubject.next([...this.architectChatSubject.getValue(), botMsg]);
     }, 1000);
   }
@@ -784,11 +1071,13 @@ export class SimulatedBackendService {
   }
 
   public createWorkRequest(intent: string) {
+    const id = `wr-${Date.now()}`;
     const newWR: WorkRequest = {
-      id: `wr-${Date.now()}`,
+      id,
       intent,
       status: 'NEW',
-      created_at: new Date()
+      created_at: new Date(),
+      detail: buildDefaultWorkRequestDetail(id, intent, 'NEW')
     };
     this.workRequestsSubject.next([...this.workRequestsSubject.getValue(), newWR]);
     
@@ -1100,7 +1389,7 @@ export class SimulatedBackendService {
 
       this.addToast({
         title: 'Workflow Validated 🎉',
-        message: '100% compliance score! LOSM work request completed successfully.',
+        message: '100% compliance score! Plurality work request completed successfully.',
         type: 'success',
         agentId: 'a4',
         agentName: 'Validator',
@@ -1117,6 +1406,7 @@ export class SimulatedBackendService {
   public addAgent(newAgentData: {
     name: string;
     role: string;
+    flavor?: 'leased' | 'harness';
     model?: string;
     systemPrompt?: string;
     temperature?: number;
@@ -1130,6 +1420,7 @@ export class SimulatedBackendService {
       name: newAgentData.name || 'Custom Agent',
       role: newAgentData.role || 'Specialist',
       status: 'idle',
+      flavor: newAgentData.flavor || 'leased',
       model: newAgentData.model || 'claude-3-5-sonnet',
       lastActive: new Date(),
       avatarUrl: newAgentData.avatarUrl || avatarPlannerAlt,
@@ -1141,7 +1432,7 @@ export class SimulatedBackendService {
     };
 
     const current = this.activeAgentsSubject.getValue();
-    const updated = [...current, newAgent];
+    const updated = sortAgentsByRole([...current, newAgent]);
     this.activeAgentsSubject.next(updated);
     savePersistedAgents(updated);
 
@@ -1150,8 +1441,8 @@ export class SimulatedBackendService {
       agentName: newAgent.name,
       level: 'info',
       action: 'AGENT_CREATED',
-      details: `Created new custom agent [${newAgent.name}] (${newAgent.role}) configured with model [${newAgent.model}].`,
-      metadata: { model: newAgent.model, role: newAgent.role }
+      details: `Created new custom agent [${newAgent.name}] (${newAgent.role}) configured with role flavor [${newAgent.flavor?.toUpperCase()}].`,
+      metadata: { flavor: newAgent.flavor, role: newAgent.role }
     });
 
     this.addToast({
@@ -1177,7 +1468,7 @@ export class SimulatedBackendService {
     }
 
     const agentToDelete = current.find(a => a.id === agentId);
-    const updated = current.filter(a => a.id !== agentId);
+    const updated = sortAgentsByRole(current.filter(a => a.id !== agentId));
     this.activeAgentsSubject.next(updated);
     savePersistedAgents(updated);
 

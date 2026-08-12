@@ -511,7 +511,7 @@ export function AgentDependencyGraph({ className }: { className?: string }) {
               </span>
             </div>
             <p className="text-[11px] text-gray-400 flex items-center space-x-2 mt-0.5">
-              <span>LOSM Phase: <strong className="text-blue-400">{appState}</strong></span>
+              <span>Plurality Phase: <strong className="text-blue-400">{appState}</strong></span>
               <span>•</span>
               <span>{activeAgents.length} Active Agents</span>
               {waitingPairs.length > 0 && (
@@ -634,7 +634,7 @@ export function AgentDependencyGraph({ className }: { className?: string }) {
             </div>
           </div>
           <span className="text-[10px] text-amber-300 font-mono hidden md:inline">
-            LOSM Workflow Gate Enforcement
+            Plurality Workflow Gate Enforcement
           </span>
         </div>
       )}
@@ -704,7 +704,9 @@ export function AgentDependencyGraph({ className }: { className?: string }) {
                 <div className="min-w-0">
                   <h4 className="text-sm font-bold text-gray-100 truncate">{selectedNode.name}</h4>
                   <p className="text-xs text-purple-400 font-medium truncate">{selectedNode.role}</p>
-                  <span className="text-[10px] text-gray-500 font-mono">{selectedNode.model}</span>
+                  <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wide bg-gray-950 border border-gray-800 px-1.5 py-0.2 rounded inline-block mt-0.5">
+                    Flavor: {selectedNode.flavor || 'leased'}
+                  </span>
                 </div>
               </div>
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { TopBar } from './components/TopBar';
 import { WorkRequestList } from './components/WorkRequestList';
 import { PlanView } from './components/PlanView';
@@ -12,8 +12,16 @@ import { RoundtableModal } from './components/RoundtableModal';
 import { AgentConfigModal } from './components/AgentConfigModal';
 import { AgentDependencyGraphModal } from './components/AgentDependencyGraphModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
+import { WorkRequestDetailModal } from './components/WorkRequestDetailModal';
+import { useSimulation } from './hooks/useSimulation';
 
 export default function App() {
+  const { theme } = useSimulation();
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-950 font-sans overflow-hidden text-gray-100 relative">
       <TopBar />
@@ -41,6 +49,7 @@ export default function App() {
         <AgentConfigModal />
         <AgentDependencyGraphModal />
         <KeyboardShortcutsModal />
+        <WorkRequestDetailModal />
       </div>
     </div>
   );

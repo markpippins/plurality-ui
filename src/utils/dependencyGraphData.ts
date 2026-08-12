@@ -5,6 +5,7 @@ export interface GraphNode extends d3.SimulationNodeDatum {
   name: string;
   role: string;
   status: 'working' | 'waiting' | 'idle' | 'completed' | 'error';
+  flavor?: 'leased' | 'harness';
   model?: string;
   avatarUrl?: string;
   stage: 'intent' | 'plan' | 'review' | 'spec' | 'exec' | 'validate' | 'governance';
@@ -159,6 +160,7 @@ export function computeGraphData(
       name: a.name,
       role: a.role,
       status,
+      flavor: a.flavor || 'leased',
       model: a.model,
       avatarUrl: a.avatarUrl,
       stage,
