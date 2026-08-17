@@ -1,14 +1,18 @@
 import React from 'react';
-import { Settings, Bell, Users, Sliders, Keyboard, Workflow, Shield, Moon, Sun, FileText } from 'lucide-react';
+import { Settings, Bell, Users, Sliders, Keyboard, Workflow, Shield, Moon, Sun, FileText, HelpCircle, AlertTriangle, Flame, Split, Sparkles, LayoutTemplate, ListTodo } from 'lucide-react';
 import { useSimulation } from '../hooks/useSimulation';
 import { GlobalSearchBar } from './GlobalSearchBar';
+import { WorkspaceLayoutSelector } from './WorkspaceLayoutSelector';
 import { cn } from '../lib/utils';
 
 export function TopBar() {
   const { 
     addToast, toasts, openRoundtableModal, roundtableSession, 
-    openAgentConfigModal, openDependencyGraphModal, openWorkRequestDetailModal, toggleShortcutsModal,
-    theme, setTheme
+    openAgentConfigModal, openDependencyGraphModal, openHeatmapModal, openWorkRequestDetailModal, toggleShortcutsModal,
+    openOnboardingModal, theme, setTheme,
+    openPerformanceAlertsModal, alertRules, alertHistory, alertSettings,
+    isDualityMode, toggleDualityMode,
+    openTaskQueueModal, agentTaskQueue, layoutConfig, setLayoutMode
   } = useSimulation();
 
   const handleTestNotification = () => {
@@ -25,6 +29,10 @@ export function TopBar() {
   };
 
   const isVoting = roundtableSession?.status === 'voting';
+  const unreadAlerts = alertHistory.filter(h => !h.acknowledged).length;
+  const activeRulesCount = alertRules.filter(r => r.enabled).length;
+  const pendingTasksCount = agentTaskQueue.filter(t => t.status === 'pending').length;
+  const activeTasksCount = agentTaskQueue.filter(t => t.status === 'active').length;
 
   return (
     <div className="h-14 border-b border-gray-800 bg-gray-900 flex items-center justify-between px-4 text-sm text-gray-300 gap-2">
@@ -39,6 +47,41 @@ export function TopBar() {
       <GlobalSearchBar />
 
       <div className="flex items-center space-x-2 shrink-0">
+        {/* Agent Task Queue Button */}
+        <button
+          id="topbar-task-queue-btn"
+          onClick={() => {
+            if (layoutConfig.mode === 'queue') {
+              openTaskQueueModal();
+            } else {
+              setLayoutMode('queue');
+            }
+          }}
+          className={cn(
+            "flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-semibold shadow-sm transition-all border",
+            layoutConfig.mode === 'queue'
+              ? "bg-blue-950/90 border-blue-500 text-blue-200 ring-1 ring-blue-500/40"
+              : "bg-gradient-to-r from-blue-950/80 to-indigo-950/80 hover:from-blue-900 hover:to-indigo-900 border-blue-700/60 text-blue-200 hover:text-white"
+          )}
+          title="Open Agent Task Queue (Architect & Builder Sub-Tasks)"
+        >
+          <ListTodo className="w-4 h-4 text-blue-400" />
+          <span>Task Queue</span>
+          {activeTasksCount > 0 ? (
+            <span className="px-1.5 py-0.2 rounded-full bg-cyan-500 text-gray-950 font-mono text-[10px] font-bold animate-pulse">
+              {activeTasksCount} active
+            </span>
+          ) : pendingTasksCount > 0 ? (
+            <span className="px-1.5 py-0.2 rounded-full bg-amber-600 text-white font-mono text-[10px] font-bold">
+              {pendingTasksCount}
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono text-gray-400 bg-gray-950 border border-gray-800 px-1 rounded">
+              {agentTaskQueue.length}
+            </span>
+          )}
+        </button>
+
         {/* Work Request Detail Button */}
         <button
           onClick={() => openWorkRequestDetailModal()}
@@ -59,13 +102,24 @@ export function TopBar() {
           <span>D3 Task Graph</span>
         </button>
 
+        {/* Global Agent Activity Heatmap Button */}
+        <button
+          onClick={() => openHeatmapModal()}
+          className="flex items-center space-x-2 bg-gradient-to-r from-amber-900/80 via-purple-900/80 to-cyan-900/80 hover:from-amber-800 hover:via-purple-800 hover:to-cyan-800 border border-purple-700/60 text-purple-200 px-3 py-1.5 rounded-md text-xs font-semibold shadow-sm transition-all hover:shadow-purple-900/40"
+          title="Open interactive D3.js Global Agent Activity & Compute Density Heatmap"
+        >
+          <Flame className="w-4 h-4 text-amber-400 fill-amber-400/30" />
+          <span>Activity Heatmap</span>
+        </button>
+
         {/* Roundtable Interaction Button */}
         <button
           onClick={() => openRoundtableModal()}
           className="flex items-center space-x-2 bg-gradient-to-r from-blue-900/80 to-purple-900/80 hover:from-blue-800 hover:to-purple-800 border border-blue-700/60 text-blue-200 px-3 py-1.5 rounded-md text-xs font-semibold shadow-sm transition-all hover:shadow-blue-900/40"
+          title="Open Consensus Roundtable Modal"
         >
           <Users className="w-4 h-4 text-blue-400" />
-          <span>Roundtable Mode</span>
+          <span>Roundtable</span>
           {isVoting ? (
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
           ) : roundtableSession ? (
@@ -74,9 +128,36 @@ export function TopBar() {
             </span>
           ) : null}
         </button>
+
+        {/* Duality Mode Toggle Button */}
+        <button
+          id="duality-mode-toggle-btn"
+          onClick={() => toggleDualityMode()}
+          className={cn(
+            "flex items-center space-x-2 px-3 py-1.5 rounded-md text-xs font-semibold shadow-sm transition-all duration-200 border",
+            isDualityMode
+              ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 border-indigo-400 text-white shadow-indigo-900/50 ring-1 ring-indigo-400/40"
+              : "bg-gray-800 hover:bg-gray-700/90 border-gray-700 text-gray-300 hover:text-white"
+          )}
+          title="Toggle Duality Mode — 1:1 Operator Interaction with Architect & Inter-Agent Builder Execution"
+        >
+          <Split className={cn("w-3.5 h-3.5", isDualityMode ? "text-white animate-pulse" : "text-purple-400")} />
+          <span>Duality</span>
+          <span className={cn(
+            "text-[10px] font-mono px-1.5 py-0.5 rounded uppercase font-bold tracking-wider",
+            isDualityMode
+              ? "bg-black/30 text-emerald-300 border border-emerald-400/30"
+              : "bg-gray-900 text-gray-400 border border-gray-700"
+          )}>
+            {isDualityMode ? 'ON' : 'OFF'}
+          </span>
+        </button>
       </div>
 
       <div className="flex items-center space-x-2.5">
+        {/* Workspace Layout Manager View Mode Selector */}
+        <WorkspaceLayoutSelector />
+
         {/* Theme Toolbar Toggle */}
         <div className="flex items-center bg-gray-950/80 p-0.5 rounded-lg border border-gray-800 shrink-0 shadow-inner">
           <button
@@ -123,6 +204,15 @@ export function TopBar() {
         </div>
 
         <button
+          onClick={() => openOnboardingModal()}
+          className="flex items-center space-x-1.5 bg-blue-950/80 hover:bg-blue-900 border border-blue-700/80 text-blue-200 px-2.5 py-1.5 rounded-md text-xs font-semibold shadow-sm transition-all hover:text-white"
+          title="Launch Interactive Layout & Multi-Agent Onboarding Tutorial"
+        >
+          <HelpCircle className="w-3.5 h-3.5 text-blue-400" />
+          <span className="hidden sm:inline">Tutorial Tour</span>
+        </button>
+
+        <button
           onClick={() => toggleShortcutsModal()}
           className="flex items-center space-x-1 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 px-2 py-1.5 rounded-md text-xs font-semibold transition-colors"
           title="Press '?' for Keyboard Shortcuts Reference"
@@ -138,6 +228,30 @@ export function TopBar() {
         >
           <Sliders className="w-3.5 h-3.5 text-purple-400" />
           <span>Agent Config</span>
+        </button>
+
+        {/* Performance Threshold Alerts Configuration Button */}
+        <button
+          onClick={() => openPerformanceAlertsModal()}
+          className={cn(
+            "flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all border shadow-sm",
+            unreadAlerts > 0
+              ? "bg-amber-950/80 border-amber-600/80 text-amber-200 hover:bg-amber-900"
+              : "bg-gray-800 hover:bg-gray-700 text-gray-200 border-gray-700"
+          )}
+          title="Configure Global Performance Threshold Alerts (Latency, Throughput, Tokens, Errors)"
+        >
+          <Bell className={cn("w-3.5 h-3.5", unreadAlerts > 0 ? "text-amber-400 animate-bounce" : "text-blue-400")} />
+          <span>Alerts</span>
+          {unreadAlerts > 0 ? (
+            <span className="px-1 py-0.2 rounded-full bg-rose-600 text-white font-mono text-[10px] font-bold">
+              {unreadAlerts}
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono text-gray-400 bg-gray-900 border border-gray-700 px-1 rounded">
+              {activeRulesCount}
+            </span>
+          )}
         </button>
 
         <button

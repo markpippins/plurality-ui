@@ -31,6 +31,170 @@ export interface ChatMessage {
   isStreaming?: boolean;
 }
 
+export interface DecisionCardOption {
+  id: string;
+  label: string;
+  description: string;
+  impact?: {
+    latency?: string;
+    complexity?: 'Low' | 'Medium' | 'High';
+    security?: string;
+    resilience?: string;
+    score?: number;
+  };
+  recommended?: boolean;
+}
+
+export interface DecisionCard {
+  id: string;
+  title: string;
+  description: string;
+  category?: 'architecture' | 'implementation' | 'schema' | 'security' | 'library';
+  options: DecisionCardOption[];
+  selectedOptionId?: string | null;
+  status: 'pending' | 'resolved' | 'dismissed';
+}
+
+export interface DualityMessage {
+  id: string;
+  sender: 'user' | 'primary_agent';
+  role: string;
+  agentName?: string;
+  agentId?: string;
+  model?: string;
+  content: string;
+  decisionCards?: DecisionCard[];
+  timestamp: Date;
+  isStreaming?: boolean;
+  latencyMs?: number;
+  tokensUsed?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  tokensPerSec?: number;
+}
+
+export interface InterAgentDialogMessage {
+  id: string;
+  senderAgentId: string;
+  senderName: string;
+  senderRole: string;
+  recipientAgentId: string;
+  recipientName: string;
+  recipientRole: string;
+  type: 'spec_handoff' | 'clarification' | 'code_proposal' | 'review_feedback' | 'validation_ack' | 'tool_call';
+  content: string;
+  codeSnippet?: {
+    filename: string;
+    language: string;
+    code: string;
+  };
+  diffSummary?: {
+    added: number;
+    removed: number;
+    file: string;
+  };
+  status?: 'delivered' | 'processing' | 'approved' | 'rejected';
+  timestamp: Date;
+  latencyMs?: number;
+  tokensUsed?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  tokensPerSec?: number;
+}
+
+export interface DualityTurnMetric {
+  turnId: string;
+  timestamp: Date;
+  role: string;
+  agentName: string;
+  agentId: string;
+  model: string;
+  action: string;
+  latencyMs: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  tokensPerSec: number;
+  status: 'success' | 'warn' | 'error';
+}
+
+export interface DualityAgentMetric {
+  agentId: string;
+  role: string;
+  agentName: string;
+  model: string;
+  turnsCount: number;
+  lastLatencyMs: number;
+  avgLatencyMs: number;
+  minLatencyMs: number;
+  maxLatencyMs: number;
+  totalTokensUsed: number;
+  promptTokens: number;
+  completionTokens: number;
+  tokensPerSec: number;
+  cacheHitPct: number;
+  estimatedCostUsd: number;
+  slaTargetMs: number;
+  status: 'idle' | 'working' | 'ready';
+  latencyHistory: number[];
+  tokensHistory: number[];
+}
+
+export interface DualityPerformanceMetrics {
+  primary: DualityAgentMetric;
+  secondary: DualityAgentMetric;
+  totalSessionTokens: number;
+  totalSessionCostUsd: number;
+  totalTurns: number;
+  lastUpdated: string;
+  recentTurns: DualityTurnMetric[];
+  benchmarkRunning?: boolean;
+}
+
+export interface BuilderTraceEvent {
+  id: string;
+  timestamp: Date;
+  step: string;
+  agent: string;
+  action: string;
+  details: string;
+  status: 'success' | 'running' | 'warning' | 'error';
+  durationMs?: number;
+  tokensUsed?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  toolUsed?: string;
+}
+
+export interface DualityState {
+  enabled: boolean;
+  primaryRole: string;
+  primaryModel: string;
+  primaryAgentId: string;
+  secondaryRole: string;
+  secondaryModel: string;
+  secondaryAgentId: string;
+  isExecuting: boolean;
+  userMessages: DualityMessage[];
+  interAgentDialog: InterAgentDialogMessage[];
+  builderTrace: BuilderTraceEvent[];
+  performanceMetrics?: DualityPerformanceMetrics;
+}
+
+export type WorkspaceLayoutMode = 'default' | 'analysis' | 'execution' | 'debugging' | 'duality' | 'queue';
+
+export interface WorkspaceLayoutConfig {
+  mode: WorkspaceLayoutMode;
+  showWorkRequests: boolean;
+  showTimeline: boolean;
+  showTerminal: boolean;
+  showFileTree: boolean;
+  showLogDrawer: boolean;
+  showTaskQueue?: boolean;
+  planPanelExpanded?: boolean;
+  executionPanelExpanded?: boolean;
+}
+
 export interface AgentLog {
   id: string;
   agent: 'architect' | 'builder';
@@ -118,17 +282,21 @@ export interface WorkRequestDetail {
   path: string;
 }
 
+export type TaskPriority = 'Low' | 'Medium' | 'High';
+
 export interface WorkRequest {
   id: string;
   intent: string;
   status: AppState;
   created_at: Date;
+  priority?: TaskPriority;
   detail?: WorkRequestDetail;
   rawPayload?: Record<string, any>;
 }
 
-export function buildDefaultWorkRequestDetail(id: string, intentStr: string, statusStr: AppState): WorkRequestDetail {
+export function buildDefaultWorkRequestDetail(id: string, intentStr: string, statusStr: AppState, priority: TaskPriority = 'Medium'): WorkRequestDetail {
   const nowStr = new Date().toISOString();
+  const lowerPriority = priority.toLowerCase() as 'low' | 'medium' | 'high';
   return {
     id: id.startsWith('wr-') ? id : `wr-${id}`,
     version: 1,
@@ -136,7 +304,7 @@ export function buildDefaultWorkRequestDetail(id: string, intentStr: string, sta
       problem_statement: intentStr,
       desired_outcome: `Execute workflow task: ${intentStr}`,
       domain: 'nexus',
-      priority: 'medium',
+      priority: lowerPriority,
       user_intent_trace: '0086',
       abstraction_level: 'task'
     },
@@ -296,6 +464,7 @@ export interface ActiveAgent {
   name: string;
   role: string;
   status: 'idle' | 'working' | 'waiting' | 'error' | 'active';
+  activityState?: 'idle' | 'planning' | 'executing' | 'validating' | 'waiting' | 'error';
   flavor?: 'leased' | 'harness';
   model?: string;
   lastActive?: Date;
@@ -305,6 +474,37 @@ export interface ActiveAgent {
   topP?: number;
   maxTokens?: number;
   avatarPrompt?: string;
+}
+
+export type AgentArchetypeCategory = 
+  | 'planning'
+  | 'architecture'
+  | 'security'
+  | 'engineering'
+  | 'quality'
+  | 'data'
+  | 'topology'
+  | 'reasoning'
+  | 'custom';
+
+export interface AgentConfigTemplate {
+  id: string;
+  name: string;
+  description: string;
+  archetype: AgentArchetypeCategory;
+  role: string;
+  flavor: 'leased' | 'harness';
+  systemPrompt: string;
+  temperature: number;
+  topP: number;
+  maxTokens: number;
+  avatarPrompt?: string;
+  avatarUrl?: string;
+  isBuiltIn?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+  tags?: string[];
+  recommendedModel?: string;
 }
 
 export interface AgentLogEntry {
@@ -355,6 +555,573 @@ export interface RoundtableSession {
   consensusSummary: string;
   createdAt: Date;
   participantAgentIds?: string[];
+}
+
+export interface AgentMetricItem {
+  agentId: string;
+  agentName: string;
+  agentRole: string;
+  tasksCompleted: number;
+  avgCompletionTimeMs: number;
+  totalTokensUsed: number;
+  promptTokens: number;
+  completionTokens: number;
+  tokensPerSec: number;
+  errorCount: number;
+  lastActiveTimestamp?: Date;
+}
+
+export interface TaskMetricRecord {
+  id: string;
+  intent: string;
+  durationMs: number;
+  tokensUsed: number;
+  completedAt: Date;
+  status: 'success' | 'failed';
+}
+
+export interface PerformanceMetricsSummary {
+  totalTasksCompleted: number;
+  activeTasksRunning: number;
+  avgTaskDurationMs: number;
+  lastTaskDurationMs: number;
+  totalTokens: number;
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  avgTokensPerSec: number;
+  successRatePercent: number;
+  agentMetrics: AgentMetricItem[];
+  recentTaskHistory: TaskMetricRecord[];
+}
+
+export interface TaskLifecycleStageMetric {
+  stage: string;
+  stageShort: string;
+  phaseKey: 'ingest' | 'plan' | 'critique' | 'spec' | 'exec' | 'validate' | 'done';
+  agentId: string;
+  agentName: string;
+  agentRole: string;
+  durationMs: number;
+  cumulativeDurationMs: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  cumulativeTokens: number;
+  tokensPerSec: number;
+  slaTargetMs: number;
+  confidenceScore: number;
+  alignmentScore: number;
+  riskScore: number;
+  status: 'completed' | 'in_progress' | 'pending' | 'warning' | 'failed';
+  timestamp: string;
+}
+
+export interface TaskLifecyclePerformanceReport {
+  taskId: string;
+  taskIntent: string;
+  totalDurationMs: number;
+  totalTokens: number;
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  overallEfficiencyTokPerSec: number;
+  status: string;
+  stages: TaskLifecycleStageMetric[];
+}
+
+export function generateTaskLifecycleMetrics(
+  taskId: string, 
+  intent: string, 
+  currentStatus: AppState | string = 'VALIDATE'
+): TaskLifecyclePerformanceReport {
+  // Deterministic generator based on task id for realistic stage metrics
+  const seed = (taskId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % 100;
+  
+  const planDur = 1100 + (seed * 12);
+  const critiqueDur = 850 + (seed * 8);
+  const specDur = 720 + (seed * 6);
+  const execDur = 1950 + (seed * 20);
+  const validateDur = 980 + (seed * 10);
+
+  const planPrompt = 2800 + (seed * 25);
+  const planComp = 1200 + (seed * 15);
+  
+  const critiquePrompt = 1900 + (seed * 18);
+  const critiqueComp = 750 + (seed * 10);
+
+  const specPrompt = 2100 + (seed * 20);
+  const specComp = 950 + (seed * 12);
+
+  const execPrompt = 3400 + (seed * 35);
+  const execComp = 2100 + (seed * 25);
+
+  const valPrompt = 1800 + (seed * 15);
+  const valComp = 650 + (seed * 8);
+
+  const rawStages = [
+    {
+      stage: 'Intent Ingestion',
+      stageShort: 'Ingest',
+      phaseKey: 'ingest' as const,
+      agentId: 'a1',
+      agentName: 'Planner',
+      agentRole: 'Planner',
+      durationMs: 250,
+      promptTokens: 800,
+      completionTokens: 250,
+      tokensPerSec: 160,
+      slaTargetMs: 400,
+      confidenceScore: 98,
+      alignmentScore: 99,
+      riskScore: 5,
+      activeState: 'PLAN'
+    },
+    {
+      stage: 'Plan Synthesis (IR)',
+      stageShort: 'Plan IR',
+      phaseKey: 'plan' as const,
+      agentId: 'a1',
+      agentName: 'Planner',
+      agentRole: 'Planner',
+      durationMs: planDur,
+      promptTokens: planPrompt,
+      completionTokens: planComp,
+      tokensPerSec: 138,
+      slaTargetMs: 1500,
+      confidenceScore: 92,
+      alignmentScore: 96,
+      riskScore: 12,
+      activeState: 'PLAN'
+    },
+    {
+      stage: 'Architectural Critique',
+      stageShort: 'Review',
+      phaseKey: 'critique' as const,
+      agentId: 'a2',
+      agentName: 'Critic',
+      agentRole: 'Reviewer',
+      durationMs: critiqueDur,
+      promptTokens: critiquePrompt,
+      completionTokens: critiqueComp,
+      tokensPerSec: 152,
+      slaTargetMs: 1200,
+      confidenceScore: 95,
+      alignmentScore: 94,
+      riskScore: 18,
+      activeState: 'REVIEW'
+    },
+    {
+      stage: 'Specification Blueprint',
+      stageShort: 'Spec',
+      phaseKey: 'spec' as const,
+      agentId: 'a5',
+      agentName: 'Architect',
+      agentRole: 'Architect',
+      durationMs: specDur,
+      promptTokens: specPrompt,
+      completionTokens: specComp,
+      tokensPerSec: 145,
+      slaTargetMs: 1000,
+      confidenceScore: 97,
+      alignmentScore: 98,
+      riskScore: 8,
+      activeState: 'SPEC'
+    },
+    {
+      stage: 'Code Implementation',
+      stageShort: 'Exec',
+      phaseKey: 'exec' as const,
+      agentId: 'a3',
+      agentName: 'Coder',
+      agentRole: 'Builder',
+      durationMs: execDur,
+      promptTokens: execPrompt,
+      completionTokens: execComp,
+      tokensPerSec: 116,
+      slaTargetMs: 2500,
+      confidenceScore: 89,
+      alignmentScore: 95,
+      riskScore: 22,
+      activeState: 'EXEC'
+    },
+    {
+      stage: 'Validation & Tests',
+      stageShort: 'Validate',
+      phaseKey: 'validate' as const,
+      agentId: 'a4',
+      agentName: 'Validator',
+      agentRole: 'QA & Compliance',
+      durationMs: validateDur,
+      promptTokens: valPrompt,
+      completionTokens: valComp,
+      tokensPerSec: 150,
+      slaTargetMs: 1400,
+      confidenceScore: 99,
+      alignmentScore: 99,
+      riskScore: 4,
+      activeState: 'VALIDATE'
+    }
+  ];
+
+  let cumulativeDur = 0;
+  let cumulativeTok = 0;
+
+  const stages: TaskLifecycleStageMetric[] = rawStages.map((s, idx) => {
+    const totalTok = s.promptTokens + s.completionTokens;
+    cumulativeDur += s.durationMs;
+    cumulativeTok += totalTok;
+
+    // Status based on current app state
+    let status: TaskLifecycleStageMetric['status'] = 'completed';
+    if (currentStatus === 'PLAN' && idx > 1) status = 'pending';
+    else if (currentStatus === 'PLAN' && idx === 1) status = 'in_progress';
+    else if (currentStatus === 'REVIEW' && idx > 2) status = 'pending';
+    else if (currentStatus === 'REVIEW' && idx === 2) status = 'in_progress';
+    else if (currentStatus === 'SPEC' && idx > 3) status = 'pending';
+    else if (currentStatus === 'SPEC' && idx === 3) status = 'in_progress';
+    else if (currentStatus === 'EXEC' && idx > 4) status = 'pending';
+    else if (currentStatus === 'EXEC' && idx === 4) status = 'in_progress';
+    else if (currentStatus === 'VALIDATE' && idx > 5) status = 'pending';
+    else if (currentStatus === 'VALIDATE' && idx === 5) status = 'in_progress';
+
+    return {
+      stage: s.stage,
+      stageShort: s.stageShort,
+      phaseKey: s.phaseKey,
+      agentId: s.agentId,
+      agentName: s.agentName,
+      agentRole: s.agentRole,
+      durationMs: s.durationMs,
+      cumulativeDurationMs: cumulativeDur,
+      promptTokens: s.promptTokens,
+      completionTokens: s.completionTokens,
+      totalTokens: totalTok,
+      cumulativeTokens: cumulativeTok,
+      tokensPerSec: s.tokensPerSec,
+      slaTargetMs: s.slaTargetMs,
+      confidenceScore: s.confidenceScore,
+      alignmentScore: s.alignmentScore,
+      riskScore: s.riskScore,
+      status,
+      timestamp: `+${(cumulativeDur / 1000).toFixed(1)}s`
+    };
+  });
+
+  const totalDur = cumulativeDur;
+  const totalTokens = cumulativeTok;
+  const totalPromptTokens = stages.reduce((acc, s) => acc + s.promptTokens, 0);
+  const totalCompletionTokens = stages.reduce((acc, s) => acc + s.completionTokens, 0);
+  const overallEfficiency = totalDur > 0 ? Math.round((totalTokens / (totalDur / 1000))) : 130;
+
+  return {
+    taskId,
+    taskIntent: intent,
+    totalDurationMs: totalDur,
+    totalTokens,
+    totalPromptTokens,
+    totalCompletionTokens,
+    overallEfficiencyTokPerSec: overallEfficiency,
+    status: currentStatus,
+    stages
+  };
+}
+
+// ==========================================
+// Performance Threshold Alert System Types
+// ==========================================
+
+export type AlertMetricType = 
+  | 'latency'           // Execution duration / latency (ms)
+  | 'tokensPerSec'      // Generation speed (t/s)
+  | 'tokenUsage'        // Step / turn token count
+  | 'totalTokens'       // Cumulative session tokens
+  | 'errorCount'        // Execution errors count
+  | 'successRate'       // Success rate (%)
+  | 'riskScore';        // Risk score (%)
+
+export type AlertOperator = '>' | '>=' | '<' | '<=' | '==';
+
+export type AlertSeverity = 'warn' | 'error' | 'info';
+
+export interface AlertNotificationChannels {
+  toast: boolean;
+  terminal: boolean;
+  sound: boolean;
+  agentLog: boolean;
+}
+
+export interface PerformanceAlertRule {
+  id: string;
+  name: string;
+  description?: string;
+  metric: AlertMetricType;
+  targetAgentId: 'all' | string; // 'all' or specific agent ID like 'a1', 'a2', 'a3'
+  operator: AlertOperator;
+  threshold: number;
+  unit: string;
+  severity: AlertSeverity;
+  enabled: boolean;
+  cooldownSec: number; // prevent toast storm
+  notificationChannels: AlertNotificationChannels;
+  customMessageTemplate?: string;
+  lastTriggered?: string; // ISO date string
+  triggerCount: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface AlertBreachRecord {
+  id: string;
+  ruleId: string;
+  ruleName: string;
+  metric: AlertMetricType;
+  targetAgentId: 'all' | string;
+  agentId?: string;
+  agentName?: string;
+  agentRole?: string;
+  observedValue: number;
+  thresholdValue: number;
+  operator: AlertOperator;
+  unit: string;
+  severity: AlertSeverity;
+  message: string;
+  timestamp: string; // ISO date
+  acknowledged?: boolean;
+}
+
+export interface AlertEngineSettings {
+  isGloballyEnabled: boolean;
+  soundEnabled: boolean;
+  defaultCooldownSec: number;
+  autoOpenDrawerOnCritical: boolean;
+  retentionMaxRecords: number;
+}
+
+export const DEFAULT_ALERT_RULES: PerformanceAlertRule[] = [
+  {
+    id: 'rule-latency-warning',
+    name: 'Global Latency Warning (> 200ms)',
+    description: 'Triggers when any agent turn execution exceeds the 200ms target response threshold.',
+    metric: 'latency',
+    targetAgentId: 'all',
+    operator: '>',
+    threshold: 200,
+    unit: 'ms',
+    severity: 'warn',
+    enabled: true,
+    cooldownSec: 10,
+    notificationChannels: {
+      toast: true,
+      terminal: true,
+      sound: true,
+      agentLog: true
+    },
+    triggerCount: 0,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'rule-coder-latency-critical',
+    name: 'Builder Latency Spike (> 2000ms)',
+    description: 'Triggers when the Coder/Builder agent takes longer than 2.0s on code generation.',
+    metric: 'latency',
+    targetAgentId: 'a3',
+    operator: '>',
+    threshold: 2000,
+    unit: 'ms',
+    severity: 'error',
+    enabled: true,
+    cooldownSec: 15,
+    notificationChannels: {
+      toast: true,
+      terminal: true,
+      sound: true,
+      agentLog: true
+    },
+    triggerCount: 0,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'rule-low-tps-floor',
+    name: 'Throughput Degradation (< 100 t/s)',
+    description: 'Triggers when agent generation throughput drops below the minimum 100 tokens/sec SLA floor.',
+    metric: 'tokensPerSec',
+    targetAgentId: 'all',
+    operator: '<',
+    threshold: 100,
+    unit: 'tok/s',
+    severity: 'warn',
+    enabled: true,
+    cooldownSec: 15,
+    notificationChannels: {
+      toast: true,
+      terminal: true,
+      sound: false,
+      agentLog: true
+    },
+    triggerCount: 0,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'rule-step-token-spike',
+    name: 'High Step Token Consumption (> 2500 tokens)',
+    description: 'Triggers when an individual agent task step consumes over 2,500 total tokens.',
+    metric: 'tokenUsage',
+    targetAgentId: 'all',
+    operator: '>',
+    threshold: 2500,
+    unit: 'tokens',
+    severity: 'warn',
+    enabled: true,
+    cooldownSec: 20,
+    notificationChannels: {
+      toast: true,
+      terminal: true,
+      sound: false,
+      agentLog: true
+    },
+    triggerCount: 0,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'rule-agent-error-detected',
+    name: 'Zero Error Tolerance (Errors >= 1)',
+    description: 'Immediate alert when any agent encounters an execution failure or typecheck error.',
+    metric: 'errorCount',
+    targetAgentId: 'all',
+    operator: '>=',
+    threshold: 1,
+    unit: 'errors',
+    severity: 'error',
+    enabled: true,
+    cooldownSec: 5,
+    notificationChannels: {
+      toast: true,
+      terminal: true,
+      sound: true,
+      agentLog: true
+    },
+    triggerCount: 0,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'rule-success-rate-floor',
+    name: 'Success Rate SLA Floor (< 95%)',
+    description: 'Triggers when the overall workflow success rate dips below the 95% SLA target.',
+    metric: 'successRate',
+    targetAgentId: 'all',
+    operator: '<',
+    threshold: 95,
+    unit: '%',
+    severity: 'error',
+    enabled: true,
+    cooldownSec: 30,
+    notificationChannels: {
+      toast: true,
+      terminal: true,
+      sound: true,
+      agentLog: true
+    },
+    triggerCount: 0,
+    createdAt: new Date().toISOString()
+  }
+];
+
+export interface HeatmapDataCell {
+  agentId: string;
+  agentName: string;
+  agentRole: string;
+  agentAvatarUrl?: string;
+  flavor?: 'leased' | 'harness';
+  model?: string;
+  bucketIndex: number;
+  bucketLabel: string;
+  timeStart: string;
+  timeEnd: string;
+  taskCount: number;
+  computeLoadPct: number;
+  tokensUsed: number;
+  promptTokens: number;
+  completionTokens: number;
+  avgLatencyMs: number;
+  errorCount: number;
+  cpuPct: number;
+  memoryMb: number;
+  activeActions: string[];
+  dominantState: 'idle' | 'working' | 'waiting' | 'error';
+  densityScore: number;
+}
+
+export type HeatmapMetricMode = 'compute' | 'tasks' | 'tokens' | 'latency' | 'errors' | 'density';
+export type HeatmapTimeGranularity = '10s' | '30s' | '1m' | '5m';
+export type HeatmapColorPalette = 'cyberpunk' | 'turbo' | 'viridis' | 'plasma' | 'ember' | 'emerald';
+
+// ==========================================
+// Agent Task Queue Types (Architect & Builder)
+// ==========================================
+
+export type AgentTaskStatus = 'pending' | 'active' | 'completed' | 'failed' | 'paused';
+export type AgentTaskPriority = 'critical' | 'high' | 'medium' | 'low';
+export type AgentTaskAssignee = 'architect' | 'builder';
+
+export interface AgentSubStep {
+  id: string;
+  name: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  details?: string;
+  durationMs?: number;
+}
+
+export interface AgentTaskCodeSnippet {
+  filename: string;
+  language: string;
+  code: string;
+  diffSummary?: {
+    added: number;
+    removed: number;
+  };
+}
+
+export interface AgentTaskItem {
+  id: string;
+  title: string;
+  description: string;
+  assignedAgent: AgentTaskAssignee;
+  agentId: string;
+  agentName: string;
+  agentRole: string;
+  model: string;
+  status: AgentTaskStatus;
+  priority: AgentTaskPriority;
+  progress: number; // 0 to 100
+  createdAt: string; // ISO date string
+  startedAt?: string;
+  completedAt?: string;
+  estimatedDurationMs: number;
+  actualDurationMs?: number;
+  tokensUsed?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  tokensPerSec?: number;
+  dependencies: string[]; // Task IDs required before this can run
+  outputs: string[];
+  substeps: AgentSubStep[];
+  codeSnippet?: AgentTaskCodeSnippet;
+  parentWorkRequestId?: string;
+  retryCount?: number;
+  errorMessage?: string;
+}
+
+export interface AgentTaskQueueStats {
+  totalCount: number;
+  pendingCount: number;
+  activeCount: number;
+  completedCount: number;
+  failedCount: number;
+  pausedCount: number;
+  architectCount: number;
+  builderCount: number;
+  totalTokens: number;
+  avgDurationMs: number;
+  completionRatePercent: number;
 }
 
 

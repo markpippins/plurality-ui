@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useSimulation } from '../hooks/useSimulation';
 import { AVATAR_PRESETS } from '../services/SimulatedBackendService';
-import { ActiveAgent } from '../types';
+import { ActiveAgent, AgentConfigTemplate } from '../types';
+import { AgentTemplateService } from '../services/AgentTemplateService';
 import { 
   X, Sliders, Cpu, Sparkles, RefreshCw, Check, 
   RotateCcw, Save, Shield, Terminal, Zap, Image as ImageIcon, Flame, HardDrive,
-  Plus, Trash2, UserPlus, Users
+  Plus, Trash2, UserPlus, Users, Bookmark, Layers, Download, Upload, Compass
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { AgentTemplateLibrary } from './AgentTemplateLibrary';
+import { SaveTemplateDialog } from './SaveTemplateDialog';
 
 const PROMPT_PRESETS: Record<string, Array<{ name: string; prompt: string }>> = {
   a1: [
@@ -120,6 +123,11 @@ export function AgentConfigModal() {
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
 
+  // Template Library & Save Dialog states
+  const [isTemplateLibraryOpen, setIsTemplateLibraryOpen] = useState(false);
+  const [isSaveTemplateOpen, setIsSaveTemplateOpen] = useState(false);
+  const [selectedQuickTemplateId, setSelectedQuickTemplateId] = useState<string>('');
+
   // New Agent creation state
   const [newAgentForm, setNewAgentForm] = useState<{
     name: string;
@@ -144,6 +152,8 @@ export function AgentConfigModal() {
   const isCreatingNew = activeTab === 'new';
   const currentAgent = activeAgents.find(a => a.id === activeTab) || activeAgents[0];
 
+  const availableTemplates = AgentTemplateService.getAllTemplates();
+
   useEffect(() => {
     if (selectedAgentForConfig) {
       setActiveTab(selectedAgentForConfig);
@@ -163,6 +173,7 @@ export function AgentConfigModal() {
         avatarPrompt: currentAgent.avatarPrompt || '',
         avatarUrl: currentAgent.avatarUrl
       });
+      setSelectedQuickTemplateId('');
     }
   }, [currentAgent, activeTab, isCreatingNew]);
 
@@ -219,6 +230,52 @@ export function AgentConfigModal() {
       if (remaining.length > 0) {
         setActiveTab(remaining[0].id);
       }
+    }
+  };
+
+  const handleApplyTemplate = (template: AgentConfigTemplate, mode: 'current' | 'new') => {
+    if (mode === 'new') {
+      setActiveTab('new');
+      setNewAgentForm({
+        name: template.name.replace(/ Template$/i, ''),
+        role: template.role,
+        flavor: template.flavor,
+        systemPrompt: template.systemPrompt,
+        temperature: template.temperature,
+        topP: template.topP,
+        maxTokens: template.maxTokens,
+        avatarPrompt: template.avatarPrompt || `Avatar for ${template.name}`
+      });
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        role: template.role,
+        flavor: template.flavor,
+        systemPrompt: template.systemPrompt,
+        temperature: template.temperature,
+        topP: template.topP,
+        maxTokens: template.maxTokens,
+        avatarPrompt: template.avatarPrompt || prev.avatarPrompt
+      }));
+    }
+  };
+
+  const handleQuickTemplateChange = (tmplId: string) => {
+    setSelectedQuickTemplateId(tmplId);
+    if (!tmplId) return;
+
+    const tmpl = availableTemplates.find(t => t.id === tmplId);
+    if (tmpl) {
+      if (isCreatingNew) {
+        handleApplyTemplate(tmpl, 'new');
+      } else {
+        handleApplyTemplate(tmpl, 'current');
+      }
+      addToast({
+        title: `⚡ Template Applied: ${tmpl.name}`,
+        message: `Applied ${tmpl.archetype.toUpperCase()} archetype hyper-parameters and system prompt.`,
+        type: 'success'
+      });
     }
   };
 
@@ -299,65 +356,97 @@ export function AgentConfigModal() {
                   </span>
                 </div>
                 <p className="text-xs text-gray-400">
-                  Configure system instructions, role flavor (Leased / Harness), temperature creativity, and profile avatars per agent.
+                  Configure system instructions, role flavor (Leased / Harness), temperature creativity, and archetype templates.
                 </p>
               </div>
             </div>
 
-            <button 
-              onClick={closeAgentConfigModal}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            {/* Header Right Actions */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setIsTemplateLibraryOpen(true)}
+                className="px-3 py-1.5 bg-gradient-to-r from-purple-900/80 to-indigo-900/80 hover:from-purple-800 hover:to-indigo-800 text-purple-200 border border-purple-600/70 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all shadow-sm"
+                title="Browse, save and load agent archetype templates"
+              >
+                <Bookmark className="w-3.5 h-3.5 text-purple-300" />
+                <span>Archetype Templates ({availableTemplates.length})</span>
+              </button>
+
+              <button
+                onClick={() => setIsSaveTemplateOpen(true)}
+                className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-medium flex items-center space-x-1.5 transition-colors border border-gray-700"
+                title="Save current configuration as a new reusable template"
+              >
+                <Save className="w-3.5 h-3.5 text-purple-400" />
+                <span>Save as Template</span>
+              </button>
+
+              <button 
+                onClick={closeAgentConfigModal}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors ml-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Agent Switcher Tabs */}
-          <div className="bg-gray-950/80 px-6 py-2 border-b border-gray-800 flex items-center space-x-2 shrink-0 overflow-x-auto">
-            {[...activeAgents]
-              .sort((a, b) => a.role.localeCompare(b.role, undefined, { sensitivity: 'base' }))
-              .map((ag) => (
+          <div className="bg-gray-950/80 px-6 py-2 border-b border-gray-800 flex items-center justify-between shrink-0 overflow-x-auto">
+            <div className="flex items-center space-x-2">
+              {[...activeAgents]
+                .sort((a, b) => a.role.localeCompare(b.role, undefined, { sensitivity: 'base' }))
+                .map((ag) => (
+                <button
+                  key={ag.id}
+                  onClick={() => setActiveTab(ag.id)}
+                  className={cn(
+                    "flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all shrink-0 border",
+                    activeTab === ag.id 
+                      ? "bg-purple-950/60 text-purple-200 border-purple-700/80 shadow-sm" 
+                      : "text-gray-400 hover:text-gray-200 hover:bg-gray-900 border-transparent"
+                  )}
+                >
+                  {ag.avatarUrl ? (
+                    <img 
+                      src={ag.avatarUrl} 
+                      alt={ag.name} 
+                      referrerPolicy="no-referrer"
+                      className="w-5 h-5 rounded-full object-cover border border-gray-700 shrink-0" 
+                    />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full bg-gray-800 flex items-center justify-center text-[10px] font-bold">
+                      {ag.name[0]}
+                    </div>
+                  )}
+                  <div className="text-left leading-tight">
+                    <span className="block font-semibold">{ag.name}</span>
+                    <span className="text-[9px] text-gray-500 uppercase tracking-widest block">{ag.role}</span>
+                  </div>
+                </button>
+              ))}
+
+              {/* Add New Agent Button */}
               <button
-                key={ag.id}
-                onClick={() => setActiveTab(ag.id)}
+                onClick={() => setActiveTab('new')}
                 className={cn(
-                  "flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all shrink-0 border",
-                  activeTab === ag.id 
-                    ? "bg-purple-950/60 text-purple-200 border-purple-700/80 shadow-sm" 
-                    : "text-gray-400 hover:text-gray-200 hover:bg-gray-900 border-transparent"
+                  "flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all shrink-0 border ml-2",
+                  isCreatingNew 
+                    ? "bg-emerald-950/70 text-emerald-200 border-emerald-600/80 shadow-sm" 
+                    : "bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 border-emerald-800/60"
                 )}
               >
-                {ag.avatarUrl ? (
-                  <img 
-                    src={ag.avatarUrl} 
-                    alt={ag.name} 
-                    referrerPolicy="no-referrer"
-                    className="w-5 h-5 rounded-full object-cover border border-gray-700 shrink-0" 
-                  />
-                ) : (
-                  <div className="w-5 h-5 rounded-full bg-gray-800 flex items-center justify-center text-[10px] font-bold">
-                    {ag.name[0]}
-                  </div>
-                )}
-                <div className="text-left leading-tight">
-                  <span className="block font-semibold">{ag.name}</span>
-                  <span className="text-[9px] text-gray-500 uppercase tracking-widest block">{ag.role}</span>
-                </div>
+                <UserPlus className="w-3.5 h-3.5 text-emerald-400" />
+                <span>+ Add Agent</span>
               </button>
-            ))}
+            </div>
 
-            {/* Add New Agent Button */}
+            {/* Quick Archetype Template Button */}
             <button
-              onClick={() => setActiveTab('new')}
-              className={cn(
-                "flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all shrink-0 border ml-2",
-                isCreatingNew 
-                  ? "bg-emerald-950/70 text-emerald-200 border-emerald-600/80 shadow-sm" 
-                  : "bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 border-emerald-800/60"
-              )}
+              onClick={() => setIsTemplateLibraryOpen(true)}
+              className="text-xs text-purple-400 hover:text-purple-300 flex items-center space-x-1 font-medium hover:underline shrink-0 ml-4"
             >
-              <UserPlus className="w-3.5 h-3.5 text-emerald-400" />
-              <span>+ Add Agent</span>
+              <Bookmark className="w-3.5 h-3.5" />
+              <span>Browse Template Library &rarr;</span>
             </button>
           </div>
 
@@ -368,6 +457,40 @@ export function AgentConfigModal() {
             {isCreatingNew ? (
               <>
                 <div className="lg:col-span-2 space-y-5">
+                  {/* Quick Archetype Loader for New Agent */}
+                  <div className="bg-gradient-to-r from-purple-950/40 to-indigo-950/40 border border-purple-800/60 p-3.5 rounded-xl flex items-center justify-between gap-3">
+                    <div className="flex items-center space-x-2 text-xs">
+                      <Bookmark className="w-4 h-4 text-purple-400 shrink-0" />
+                      <div>
+                        <span className="font-semibold text-purple-200 block">Bootstrap with Archetype Template:</span>
+                        <span className="text-[11px] text-gray-400">Pre-fill parameters from a battle-tested agent archetype.</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <select
+                        value={selectedQuickTemplateId}
+                        onChange={e => handleQuickTemplateChange(e.target.value)}
+                        className="bg-gray-900 border border-purple-700/80 text-xs text-purple-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-purple-400"
+                      >
+                        <option value="">-- Choose Template --</option>
+                        {availableTemplates.map(t => (
+                          <option key={t.id} value={t.id}>
+                            {t.name} ({t.archetype})
+                          </option>
+                        ))}
+                      </select>
+                      
+                      <button
+                        type="button"
+                        onClick={() => setIsTemplateLibraryOpen(true)}
+                        className="px-2.5 py-1.5 bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-700/70 rounded-lg text-xs font-semibold"
+                      >
+                        Browse All
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="bg-emerald-950/20 border border-emerald-800/60 p-4 rounded-xl space-y-4">
                     <div className="flex items-center space-x-2 text-emerald-400 font-bold text-sm">
                       <UserPlus className="w-4 h-4" />
@@ -484,6 +607,42 @@ export function AgentConfigModal() {
               /* Existing Agent Configuration */
               <>
                 <div className="lg:col-span-2 space-y-5">
+                  {/* Archetype Template Quick Loader Bar */}
+                  <div className="bg-gradient-to-r from-purple-950/40 via-gray-950/60 to-indigo-950/40 border border-purple-800/50 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center space-x-2 text-xs">
+                      <Bookmark className="w-4 h-4 text-purple-400 shrink-0" />
+                      <div>
+                        <span className="font-semibold text-purple-200 block">Apply Archetype Template:</span>
+                        <span className="text-[10px] text-gray-400">Load calibrated role instructions and hyper-parameters.</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <select
+                        value={selectedQuickTemplateId}
+                        onChange={e => handleQuickTemplateChange(e.target.value)}
+                        className="bg-gray-900 border border-purple-700/80 text-xs text-purple-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-purple-400"
+                      >
+                        <option value="">-- Select Archetype Template --</option>
+                        {availableTemplates.map(t => (
+                          <option key={t.id} value={t.id}>
+                            {t.name} ({t.archetype})
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsTemplateLibraryOpen(true)}
+                        className="px-2.5 py-1.5 bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-700/70 rounded-lg text-xs font-semibold flex items-center space-x-1"
+                        title="Open full template library with search and filters"
+                      >
+                        <Layers className="w-3 h-3" />
+                        <span>Library</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* System Prompt Section */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -491,9 +650,20 @@ export function AgentConfigModal() {
                         <Terminal className="w-4 h-4 text-purple-400" />
                         <span>System Instructions / Role Prompt</span>
                       </label>
-                      <span className="text-[10px] font-mono text-gray-500">
-                        {(formData.systemPrompt || '').length} chars
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsSaveTemplateOpen(true)}
+                          className="text-[11px] text-purple-400 hover:text-purple-300 flex items-center space-x-1 hover:underline"
+                          title="Save this prompt & configuration as a reusable template"
+                        >
+                          <Bookmark className="w-3 h-3" />
+                          <span>Save as Template</span>
+                        </button>
+                        <span className="text-[10px] font-mono text-gray-500">
+                          {(formData.systemPrompt || '').length} chars
+                        </span>
+                      </div>
                     </div>
 
                     <div className="relative rounded-lg border border-gray-800 bg-gray-950/90 overflow-hidden focus-within:border-purple-500 transition-colors">
@@ -774,9 +944,19 @@ export function AgentConfigModal() {
               </button>
 
               <button
+                onClick={() => setIsSaveTemplateOpen(true)}
+                className="px-3.5 py-2 bg-purple-950/60 hover:bg-purple-900/80 text-purple-300 border border-purple-800/80 text-xs font-medium rounded-md transition-colors flex items-center space-x-1.5"
+                title="Save current agent configuration as a reusable template"
+              >
+                <Bookmark className="w-3.5 h-3.5 text-purple-400" />
+                <span>Save As Template</span>
+              </button>
+
+              <button
                 onClick={() => {
-                  if (confirm('Are you sure you want to clear all persisted local storage data and restore default agent configs and logs?')) {
+                  if (confirm('Are you sure you want to clear all persisted local storage data and restore default agent configs, templates and logs?')) {
                     resetPersistedStorage();
+                    AgentTemplateService.resetCustomTemplates();
                     closeAgentConfigModal();
                   }
                 }}
@@ -815,6 +995,40 @@ export function AgentConfigModal() {
           </div>
         </motion.div>
       </div>
+
+      {/* Template Library Modal */}
+      {isTemplateLibraryOpen && (
+        <AgentTemplateLibrary
+          isOpen={isTemplateLibraryOpen}
+          onClose={() => setIsTemplateLibraryOpen(false)}
+          onApplyTemplate={handleApplyTemplate}
+          currentAgentName={isCreatingNew ? 'New Agent' : currentAgent?.name || 'Agent'}
+          currentAgentRole={isCreatingNew ? 'New Role' : currentAgent?.role || 'Specialist'}
+          currentAgentData={isCreatingNew ? newAgentForm : formData}
+          onToast={addToast}
+        />
+      )}
+
+      {/* Save Template Dialog */}
+      {isSaveTemplateOpen && (
+        <SaveTemplateDialog
+          isOpen={isSaveTemplateOpen}
+          onClose={() => setIsSaveTemplateOpen(false)}
+          initialData={isCreatingNew ? newAgentForm : {
+            ...formData,
+            name: formData.name || currentAgent?.name,
+            role: formData.role || currentAgent?.role
+          }}
+          onSaved={(savedTmpl) => {
+            addToast({
+              title: '💾 Archetype Template Saved',
+              message: `Configuration template "${savedTmpl.name}" saved to template library.`,
+              type: 'success'
+            });
+          }}
+        />
+      )}
     </AnimatePresence>
   );
 }
+

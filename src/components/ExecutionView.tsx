@@ -3,14 +3,20 @@ import { useSimulation } from '../hooks/useSimulation';
 import { Activity, CheckCircle2, Clock, AlertCircle, TerminalSquare } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { DualityExecutionPanel } from './DualityExecutionPanel';
 
 export function ExecutionView() {
-  const { executionIR, validationIR } = useSimulation();
+  const { executionIR, validationIR, isDualityMode } = useSimulation();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [executionIR, validationIR]);
+
+  // If Duality mode is enabled, render the Duality Execution & Inter-Agent Trace Panel
+  if (isDualityMode) {
+    return <DualityExecutionPanel />;
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {

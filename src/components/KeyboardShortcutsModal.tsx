@@ -16,8 +16,12 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     category: 'System & Overlays',
     items: [
-      { keys: ['⌘K', 'Ctrl+K', '/'], description: 'Focus Global Search Bar (Agents, Logs, Task IDs)', actionLabel: 'Global Search' },
+      { keys: ['⌘K', 'Ctrl+K', '/'], description: 'Open Global Command Palette & Action Launcher', actionLabel: 'Command Palette' },
+      { keys: ['Q'], description: 'Open Agent Sub-Task Execution Queue (Architect & Builder)', actionLabel: 'Task Queue' },
+      { keys: ['A'], description: 'Open Global Performance Threshold Alerts Config (Latency > 200ms)', actionLabel: 'Performance Alerts' },
+      { keys: ['TOUR'], description: 'Launch Interactive Onboarding Layout & Workflow Tutorial', actionLabel: 'Onboarding Tour' },
       { keys: ['?'], description: 'Toggle Keyboard Shortcuts Overlay', actionLabel: 'Help Panel' },
+      { keys: ['H'], description: 'Open Global Agent Activity & Compute Density Heatmap (D3.js)', actionLabel: 'Activity Heatmap' },
       { keys: ['G'], description: 'Open D3.js Task & Agent Dependency Graph', actionLabel: 'Task Graph' },
       { keys: ['C'], description: 'Open Agent Persona & Parameter Matrix', actionLabel: 'Agent Config' },
       { keys: ['Esc'], description: 'Close active modal, drawer, or dialog', actionLabel: 'Dismiss UI' },
@@ -51,6 +55,8 @@ export function KeyboardShortcutsModal() {
     openRoundtableModal, isRoundtableOpen, closeRoundtableModal,
     openAgentConfigModal, isAgentConfigOpen, closeAgentConfigModal,
     openDependencyGraphModal, isDependencyGraphOpen, closeDependencyGraphModal,
+    openHeatmapModal, isHeatmapOpen, closeHeatmapModal, toggleHeatmapModal,
+    openOnboardingModal,
     selectedAgent, selectAgentForLogs, activeAgents,
     workRequests, activeWorkRequest, BackendService
   } = useSimulation();
@@ -72,6 +78,7 @@ export function KeyboardShortcutsModal() {
         if (isRoundtableOpen) closeRoundtableModal();
         if (isAgentConfigOpen) closeAgentConfigModal();
         if (isDependencyGraphOpen) closeDependencyGraphModal();
+        if (isHeatmapOpen) closeHeatmapModal();
         if (selectedAgent) selectAgentForLogs(null);
         return;
       }
@@ -82,6 +89,20 @@ export function KeyboardShortcutsModal() {
       if (e.key === '?' || (e.shiftKey && e.key === '/')) {
         e.preventDefault();
         toggleShortcutsModal();
+        return;
+      }
+
+      // 'h' or 'H' -> Open Global Agent Activity Heatmap
+      if (e.key === 'h' || e.key === 'H') {
+        e.preventDefault();
+        toggleHeatmapModal();
+        return;
+      }
+
+      // 'q' or 'Q' -> Open Agent Task Queue
+      if (e.key === 'q' || e.key === 'Q') {
+        e.preventDefault();
+        BackendService.openTaskQueueModal();
         return;
       }
 
@@ -110,6 +131,13 @@ export function KeyboardShortcutsModal() {
       if (e.key === 'c' || e.key === 'C') {
         e.preventDefault();
         openAgentConfigModal();
+        return;
+      }
+
+      // 'a' or 'A' -> Open Performance Threshold Alerts
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        BackendService.openPerformanceAlertsModal();
         return;
       }
 
@@ -247,12 +275,25 @@ export function KeyboardShortcutsModal() {
               <span>Press <kbd className="px-1.5 py-0.5 bg-gray-800 text-gray-200 text-[10px] font-mono rounded">?</kbd> anytime to toggle this command overlay.</span>
             </div>
 
-            <button
-              onClick={closeShortcutsModal}
-              className="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 font-semibold rounded-md transition-colors text-xs"
-            >
-              Close
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => {
+                  closeShortcutsModal();
+                  openOnboardingModal();
+                }}
+                className="px-3 py-1.5 bg-blue-950/80 hover:bg-blue-900 border border-blue-700/80 text-blue-200 font-semibold rounded-md transition-colors text-xs flex items-center space-x-1.5"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-blue-400" />
+                <span>Launch Interactive Tour</span>
+              </button>
+
+              <button
+                onClick={closeShortcutsModal}
+                className="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 font-semibold rounded-md transition-colors text-xs"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>

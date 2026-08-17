@@ -5,11 +5,12 @@ import {
   Layers, GitFork, Cpu, Terminal, Sparkles, Folder, ArrowRight, Activity, 
   ExternalLink, Download, ListChecks, Hash, Clock, UserCheck, TrendingUp, BarChart2,
   AlertCircle, Zap, GitBranch, GitCommit, GitMerge, FolderTree, Share2, CornerDownRight,
-  ChevronDown, ChevronRight, Box, RefreshCw, Network, PlayCircle, Search, Filter, RotateCcw
+  ChevronDown, ChevronRight, Box, RefreshCw, Network, PlayCircle, Search, Filter, RotateCcw, Home, Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { WorkRequest, WorkRequestDetail, buildDefaultWorkRequestDetail } from '../types';
+import { TaskLifecycleTrendsChart } from './TaskLifecycleTrendsChart';
 
 export function WorkRequestDetailModal() {
   const { 
@@ -22,13 +23,15 @@ export function WorkRequestDetailModal() {
     agentLogs
   } = useSimulation();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'plan' | 'requirements' | 'validation' | 'lineage' | 'activity' | 'json'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'telemetry' | 'plan' | 'requirements' | 'validation' | 'lineage' | 'activity' | 'json'>('overview');
   const [copiedId, setCopiedId] = useState(false);
   const [copiedJson, setCopiedJson] = useState(false);
   const [hoveredBucketIdx, setHoveredBucketIdx] = useState<number | null>(null);
   const [selectedBucketIdx, setSelectedBucketIdx] = useState<number | null>(null);
   const [activityLogLevel, setActivityLogLevel] = useState<'all' | 'info' | 'success' | 'warn' | 'error'>('all');
   const [activitySearch, setActivitySearch] = useState('');
+  const [timestampMode, setTimestampMode] = useState<'relative' | 'absolute'>('relative');
+  const [sparklineMetric, setSparklineMetric] = useState<'throughput' | 'latency'>('throughput');
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [lineageViewMode, setLineageViewMode] = useState<'tree' | 'graph'>('tree');
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({ parents: true, current: true, children: true });
@@ -52,6 +55,29 @@ export function WorkRequestDetailModal() {
   }, [isWorkRequestDetailOpen, closeWorkRequestDetailModal]);
 
   if (!isWorkRequestDetailOpen || !currentWr || !detail) return null;
+
+  // System & Parent hierarchy calculation for Breadcrumb Navigation Trail
+  const parentIds = detail.lineage.derived_from || [];
+  const breadcrumbParents = parentIds.map(pId => {
+    const match = workRequests.find(w => w.id === pId || w.id === `wr-${pId}`);
+    return {
+      id: pId.startsWith('wr-') ? pId : `wr-${pId}`,
+      rawId: pId,
+      title: match ? match.intent : `Parent Spec Blueprint ${pId}`,
+      status: match ? (match.detail?.execution_state?.status || 'completed') : 'completed',
+      realWr: match || null
+    };
+  });
+
+  if (breadcrumbParents.length === 0) {
+    breadcrumbParents.push({
+      id: 'wr-0133',
+      rawId: '0133',
+      title: 'Root Architectural Intent & System IR Spec',
+      status: 'completed',
+      realWr: workRequests.find(w => w.id === '0133' || w.id === 'wr-0133') || null
+    });
+  }
 
   const copyToClipboard = (text: string, type: 'id' | 'json') => {
     navigator.clipboard.writeText(text);
@@ -169,6 +195,80 @@ export function WorkRequestDetailModal() {
             </button>
           </div>
 
+          {/* Breadcrumb Navigation Trail Bar */}
+          <div className="bg-gray-950 border-b border-gray-800/80 px-6 py-2 flex items-center space-x-2 text-xs text-gray-400 overflow-x-auto font-mono shrink-0 scrollbar-none shadow-inner">
+            <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider shrink-0 mr-1 flex items-center gap-1 font-sans">
+              <Network className="w-3 h-3 text-purple-400" />
+              <span>Hierarchy:</span>
+            </span>
+
+            {/* Level 1: System / Workspace Root */}
+            <div className="flex items-center space-x-1 shrink-0 text-gray-300 hover:text-white transition-colors">
+              <Home className="w-3.5 h-3.5 text-purple-400" />
+              <span className="font-semibold tracking-wide">Workspace</span>
+            </div>
+
+            <ChevronRight className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+
+            {/* Level 2: System Domain */}
+            <div className="flex items-center space-x-1 shrink-0 bg-gray-900/90 px-2 py-0.5 rounded border border-gray-800 text-cyan-300">
+              <Folder className="w-3 h-3 text-cyan-400" />
+              <span className="font-medium text-[11px]">{detail.intent.domain || 'system_core'}</span>
+            </div>
+
+            <ChevronRight className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+
+            {/* Level 3: Parent Spec Requests in Lineage */}
+            {breadcrumbParents.map((parentItem, idx) => (
+              <React.Fragment key={idx}>
+                <button
+                  onClick={() => {
+                    if (parentItem.realWr) {
+                      openWorkRequestDetailModal(parentItem.realWr);
+                    } else {
+                      setActiveTab('lineage');
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center space-x-1.5 px-2 py-0.5 rounded border transition-all text-xs font-mono shrink-0 max-w-[210px] truncate group",
+                    parentItem.realWr
+                      ? "bg-purple-950/60 hover:bg-purple-900/80 border-purple-800/80 text-purple-200 hover:border-purple-500 cursor-pointer shadow-sm"
+                      : "bg-gray-900 hover:bg-gray-800 border-gray-800 text-gray-300 cursor-pointer"
+                  )}
+                  title={parentItem.realWr ? `Navigate to Parent: ${parentItem.title}` : `Parent Spec ID: ${parentItem.id}`}
+                >
+                  <GitFork className="w-3 h-3 text-purple-400 shrink-0 group-hover:rotate-180 transition-transform duration-200" />
+                  <span className="font-bold shrink-0">{parentItem.id}</span>
+                  <span className="text-[10px] text-gray-400 group-hover:text-purple-200 truncate hidden sm:inline">
+                    {parentItem.title}
+                  </span>
+                </button>
+
+                <ChevronRight className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+              </React.Fragment>
+            ))}
+
+            {/* Level 4: Active Current Work Request */}
+            <div className="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-md bg-blue-950/90 border border-blue-500/70 text-blue-200 font-bold font-mono shrink-0 shadow-[0_0_10px_rgba(59,130,246,0.25)]">
+              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+              <span>{detail.id}</span>
+              <span className="text-[10px] text-blue-300 font-normal max-w-[180px] sm:max-w-[240px] truncate">
+                ({detail.intent.desired_outcome || detail.intent.problem_statement})
+              </span>
+            </div>
+
+            {/* Level 5: Active Step Execution (if in step execution state) */}
+            {detail.execution_state.current_step && (
+              <>
+                <ChevronRight className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+                <div className="flex items-center space-x-1 px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-[11px] font-mono shrink-0">
+                  <Cpu className="w-3 h-3 text-emerald-400" />
+                  <span>Step: {detail.execution_state.current_step}</span>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Quick Details Ribbon */}
           <div className="bg-gray-950/50 border-b border-gray-800/80 px-6 py-2.5 flex items-center justify-between text-xs text-gray-400 overflow-x-auto gap-4 shrink-0">
             <div className="flex items-center space-x-4 shrink-0">
@@ -206,6 +306,7 @@ export function WorkRequestDetailModal() {
           <div className="px-6 bg-gray-950/80 border-b border-gray-800 flex items-center space-x-1 overflow-x-auto shrink-0 pt-2">
             {[
               { id: 'overview', label: 'Title & Source', icon: FileText },
+              { id: 'telemetry', label: 'Lifecycle Telemetry', icon: TrendingUp },
               { id: 'plan', label: 'Specification & Plan', icon: Layers },
               { id: 'requirements', label: 'Requirements & Safety', icon: Shield },
               { id: 'validation', label: 'Validation & Criteria', icon: ListChecks },
@@ -236,6 +337,13 @@ export function WorkRequestDetailModal() {
           {/* Modal Tab Content Area */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             
+            {/* TELEMETRY & LIFECYCLE TRENDS TAB */}
+            {activeTab === 'telemetry' && (
+              <div className="space-y-6">
+                <TaskLifecycleTrendsChart initialTaskId={detail.id} />
+              </div>
+            )}
+
             {/* OVERVIEW TAB */}
             {activeTab === 'overview' && (
               <div className="space-y-6">
@@ -1087,12 +1195,17 @@ export function WorkRequestDetailModal() {
                 7 + (absSeed % 3)
               ];
 
+              const baseLatenciesMs = [
+                140, 260, 480, 820, 1450, 920, 610, 390, 1180, 310, 220, 180
+              ];
+
               const sparklineBuckets = timeLabels.map((label, idx) => {
                 const count = baseCounts[idx] || 6;
+                const latencyMs = (baseLatenciesMs[idx] || 350) + ((absSeed * (idx + 3)) % 220);
                 const error = (idx === 4 && absSeed % 6 === 0) ? 1 : 0;
                 const warn = (idx % 4 === 0) ? 1 + (absSeed % 2) : 0;
                 const info = Math.max(0, count - warn - error);
-                return { label, count, info, warn, error };
+                return { label, count, latencyMs, info, warn, error };
               });
 
               const totalLogCount = sparklineBuckets.reduce((acc, b) => acc + b.count, 0);
@@ -1100,6 +1213,10 @@ export function WorkRequestDetailModal() {
               const avgLogRate = (totalLogCount / sparklineBuckets.length).toFixed(1);
               const totalErrors = sparklineBuckets.reduce((acc, b) => acc + b.error, 0);
               const totalWarnings = sparklineBuckets.reduce((acc, b) => acc + b.warn, 0);
+
+              const maxLatencyMs = Math.max(...sparklineBuckets.map(b => b.latencyMs), 1);
+              const minLatencyMs = Math.min(...sparklineBuckets.map(b => b.latencyMs));
+              const avgLatencyMs = Math.round(sparklineBuckets.reduce((acc, b) => acc + b.latencyMs, 0) / sparklineBuckets.length);
 
               // SVG layout parameters for Sparkline
               const svgWidth = 500;
@@ -1109,10 +1226,13 @@ export function WorkRequestDetailModal() {
               const graphWidth = svgWidth - padX * 2;
               const graphHeight = svgHeight - padY * 2;
 
+              const maxMetricVal = sparklineMetric === 'throughput' ? maxBucketCount : maxLatencyMs;
+
               const points = sparklineBuckets.map((b, idx) => {
+                const val = sparklineMetric === 'throughput' ? b.count : b.latencyMs;
                 const x = padX + idx * (graphWidth / (sparklineBuckets.length - 1));
-                const y = (padY + graphHeight) - (b.count / maxBucketCount) * graphHeight;
-                return { x, y, ...b };
+                const y = (padY + graphHeight) - (val / maxMetricVal) * graphHeight;
+                return { x, y, val, ...b };
               });
 
               // Construct smooth Bezier SVG curve
@@ -1128,21 +1248,88 @@ export function WorkRequestDetailModal() {
 
               const activeHoverPoint = hoveredBucketIdx !== null ? points[hoveredBucketIdx] : null;
 
+              // Anchor base time for relative / absolute timestamp calculations
+              const baseLogTimeMs = React.useMemo(() => {
+                if (detail.metadata.created_at) {
+                  const parsed = new Date(detail.metadata.created_at).getTime();
+                  if (!isNaN(parsed)) return parsed + 30 * 60 * 1000; // created_at was T-30m
+                }
+                return Date.now();
+              }, [detail.id, detail.metadata.created_at]);
+
+              const getFormattedLogTimes = (offsetMins: number, rawTag: string) => {
+                const relTime = offsetMins === 0 ? 'just now' : `${offsetMins}m ago`;
+                const dateObj = new Date(baseLogTimeMs - offsetMins * 60 * 1000);
+                const absTime = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                return { relTime, absTime, rawTag };
+              };
+
               // Complete audit log items corresponding to work request execution timeline
-              const auditLogs = [
-                { id: 'log-12', bucketIdx: 11, time: 'Now', level: 'info' as const, agent: detail.metadata.role, action: 'TELEMETRY_SYNC', msg: `Step ${detail.execution_state.current_step || 'final'} progress updated to ${(detail.execution_state.progress * 100).toFixed(0)}%`, metadata: { progress: detail.execution_state.progress, status: detail.execution_state.status } },
-                { id: 'log-11', bucketIdx: 10, time: 'T-1m', level: 'success' as const, agent: 'validator', action: 'ASSERTION_PASS', msg: `Validation assertions verified for workspace path ${detail.path}`, metadata: { passedRules: 14, score: 0.99 } },
-                { id: 'log-10', bucketIdx: 9, time: 'T-2m', level: 'info' as const, agent: 'builder', action: 'AST_MUTATION', msg: `Applied AST patch to target files (${detail.artifacts.produced_files?.length || 1} files updated)`, metadata: { files: detail.artifacts.produced_files } },
-                { id: 'log-09', bucketIdx: 8, time: 'T-4m', level: 'info' as const, agent: 'validator', action: 'TYPE_CHECK_RUN', msg: `Executed TypeScript compiler pass — 0 fatal type errors encountered`, metadata: { tscExitCode: 0, durationMs: 310 } },
-                { id: 'log-08', bucketIdx: 7, time: 'T-6m', level: 'info' as const, agent: 'builder', action: 'SPAWN_MODEL_STEP', msg: `Execution step step_1 spawned on model ${detail.metadata.model}`, metadata: { model: detail.metadata.model, temperature: 0.2 } },
-                { id: 'log-07', bucketIdx: 6, time: 'T-8m', level: 'warn' as const, agent: 'critic', action: 'EDGE_CASE_FLAG', msg: `Identified edge case in component bounds; applying safe fallback handler`, metadata: { retryCount: detail.execution_state.retries, severity: 'low' } },
-                { id: 'log-06', bucketIdx: 5, time: 'T-10m', level: 'info' as const, agent: 'architect', action: 'SPEC_IR_FINALIZE', msg: `Spec IR decomposition finalized using strategy: ${detail.decomposition.strategy}`, metadata: { strategy: detail.decomposition.strategy, parallelism: detail.decomposition.parallelism_model } },
-                { id: 'log-05', bucketIdx: 4, time: 'T-12m', level: (absSeed % 6 === 0 ? 'error' as const : 'info' as const), agent: 'coder', action: 'CODEGEN_TRANSFORM', msg: `Synthesized code generation blocks for problem: "${detail.intent.problem_statement.slice(0, 45)}..."`, metadata: { loc: 142, tokens: 1850 } },
-                { id: 'log-04', bucketIdx: 3, time: 'T-15m', level: 'info' as const, agent: 'planner', action: 'GOAL_MAPPING', msg: `Mapped desired outcome: ${detail.intent.desired_outcome}`, metadata: { stepsCount: detail.decomposition.steps.length } },
-                { id: 'log-03', bucketIdx: 2, time: 'T-20m', level: 'success' as const, agent: 'conduit', action: 'SECURITY_AUDIT', msg: `Verified prompt safety and workspace access permissions`, metadata: { sandboxMode: true, networkAccess: false } },
-                { id: 'log-02', bucketIdx: 1, time: 'T-25m', level: 'info' as const, agent: 'conduit', action: 'PARSE_REQUIREMENTS', msg: `Parsed requirements and system factors (${detail.requirements.functional.length} functional rules)`, metadata: { constraints: detail.requirements.functional } },
-                { id: 'log-01', bucketIdx: 0, time: 'T-30m', level: 'info' as const, agent: 'conduit', action: 'WORK_REQUEST_INIT', msg: `Initialized Work Request [${detail.id}] from provenance source`, metadata: { created_at: detail.metadata.created_at } },
+              const rawAuditLogs = [
+                { id: 'log-12', bucketIdx: 11, offsetMins: 0, time: 'Now', level: 'info' as const, status: (detail.execution_state.status === 'completed' ? 'Success' : detail.execution_state.status === 'failed' ? 'Error' : 'Running'), agent: detail.metadata.role, action: 'TELEMETRY_SYNC', msg: `Step ${detail.execution_state.current_step || 'final'} progress updated to ${(detail.execution_state.progress * 100).toFixed(0)}%`, metadata: { progress: detail.execution_state.progress, status: detail.execution_state.status } },
+                { id: 'log-11', bucketIdx: 10, offsetMins: 1, time: 'T-1m', level: 'success' as const, status: 'Success', agent: 'validator', action: 'ASSERTION_PASS', msg: `Validation assertions verified for workspace path ${detail.path}`, metadata: { passedRules: 14, score: 0.99 } },
+                { id: 'log-10', bucketIdx: 9, offsetMins: 2, time: 'T-2m', level: 'info' as const, status: 'Success', agent: 'builder', action: 'AST_MUTATION', msg: `Applied AST patch to target files (${detail.artifacts.produced_files?.length || 1} files updated)`, metadata: { files: detail.artifacts.produced_files } },
+                { id: 'log-09', bucketIdx: 8, offsetMins: 4, time: 'T-4m', level: 'info' as const, status: 'Success', agent: 'validator', action: 'TYPE_CHECK_RUN', msg: `Executed TypeScript compiler pass — 0 fatal type errors encountered`, metadata: { tscExitCode: 0, durationMs: 310 } },
+                { id: 'log-08', bucketIdx: 7, offsetMins: 6, time: 'T-6m', level: 'info' as const, status: 'Pending', agent: 'builder', action: 'SPAWN_MODEL_STEP', msg: `Execution step step_1 spawned on model ${detail.metadata.model}`, metadata: { model: detail.metadata.model, temperature: 0.2 } },
+                { id: 'log-07', bucketIdx: 6, offsetMins: 8, time: 'T-8m', level: 'warn' as const, status: 'Warning', agent: 'critic', action: 'EDGE_CASE_FLAG', msg: `Identified edge case in component bounds; applying safe fallback handler`, metadata: { retryCount: detail.execution_state.retries, severity: 'low' } },
+                { id: 'log-06', bucketIdx: 5, offsetMins: 10, time: 'T-10m', level: 'info' as const, status: 'Success', agent: 'architect', action: 'SPEC_IR_FINALIZE', msg: `Spec IR decomposition finalized using strategy: ${detail.decomposition.strategy}`, metadata: { strategy: detail.decomposition.strategy, parallelism: detail.decomposition.parallelism_model } },
+                { id: 'log-05', bucketIdx: 4, offsetMins: 12, time: 'T-12m', level: (absSeed % 6 === 0 ? 'error' as const : 'info' as const), status: (absSeed % 6 === 0 ? 'Error' : 'Success'), agent: 'coder', action: 'CODEGEN_TRANSFORM', msg: `Synthesized code generation blocks for problem: "${detail.intent.problem_statement.slice(0, 45)}..."`, metadata: { loc: 142, tokens: 1850 } },
+                { id: 'log-04', bucketIdx: 3, offsetMins: 15, time: 'T-15m', level: 'info' as const, status: 'Success', agent: 'planner', action: 'GOAL_MAPPING', msg: `Mapped desired outcome: ${detail.intent.desired_outcome}`, metadata: { stepsCount: detail.decomposition.steps.length } },
+                { id: 'log-03', bucketIdx: 2, offsetMins: 20, time: 'T-20m', level: 'success' as const, status: 'Success', agent: 'conduit', action: 'SECURITY_AUDIT', msg: `Verified prompt safety and workspace access permissions`, metadata: { sandboxMode: true, networkAccess: false } },
+                { id: 'log-02', bucketIdx: 1, offsetMins: 25, time: 'T-25m', level: 'info' as const, status: 'Success', agent: 'conduit', action: 'PARSE_REQUIREMENTS', msg: `Parsed requirements and system factors (${detail.requirements.functional.length} functional rules)`, metadata: { constraints: detail.requirements.functional } },
+                { id: 'log-01', bucketIdx: 0, offsetMins: 30, time: 'T-30m', level: 'info' as const, status: 'Success', agent: 'conduit', action: 'WORK_REQUEST_INIT', msg: `Initialized Work Request [${detail.id}] from provenance source`, metadata: { created_at: detail.metadata.created_at } },
               ];
+
+              const auditLogs = rawAuditLogs.map(log => {
+                const times = getFormattedLogTimes(log.offsetMins, log.time);
+                return {
+                  ...log,
+                  relTime: times.relTime,
+                  absTime: times.absTime,
+                  displayTime: timestampMode === 'relative' ? times.relTime : times.absTime
+                };
+              });
+
+              const getLogStatusBadge = (statusStr: string) => {
+                switch (statusStr.toLowerCase()) {
+                  case 'success':
+                  case 'passed':
+                  case 'completed':
+                    return {
+                      bg: 'bg-emerald-950/90 text-emerald-300 border-emerald-800 shadow-[0_0_8px_rgba(16,185,129,0.2)]',
+                      icon: CheckCircle2,
+                      label: 'Success'
+                    };
+                  case 'error':
+                  case 'failed':
+                    return {
+                      bg: 'bg-rose-950/90 text-rose-300 border-rose-800 shadow-[0_0_8px_rgba(244,63,94,0.2)]',
+                      icon: AlertCircle,
+                      label: 'Error'
+                    };
+                  case 'warning':
+                  case 'warn':
+                    return {
+                      bg: 'bg-amber-950/90 text-amber-300 border-amber-800 shadow-[0_0_8px_rgba(245,158,11,0.2)]',
+                      icon: AlertTriangle,
+                      label: 'Warning'
+                    };
+                  case 'running':
+                  case 'executing':
+                    return {
+                      bg: 'bg-blue-950/90 text-blue-300 border-blue-800 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.2)]',
+                      icon: PlayCircle,
+                      label: 'Running'
+                    };
+                  case 'pending':
+                  default:
+                    return {
+                      bg: 'bg-slate-900/90 text-slate-300 border-slate-700',
+                      icon: Clock,
+                      label: 'Pending'
+                    };
+                }
+              };
 
               const filteredAuditLogs = auditLogs.filter(log => {
                 const matchesLevel = activityLogLevel === 'all' || log.level === activityLogLevel;
@@ -1150,7 +1337,10 @@ export function WorkRequestDetailModal() {
                   log.msg.toLowerCase().includes(activitySearch.toLowerCase()) ||
                   log.action.toLowerCase().includes(activitySearch.toLowerCase()) ||
                   log.agent.toLowerCase().includes(activitySearch.toLowerCase()) ||
-                  log.time.toLowerCase().includes(activitySearch.toLowerCase());
+                  log.time.toLowerCase().includes(activitySearch.toLowerCase()) ||
+                  log.relTime.toLowerCase().includes(activitySearch.toLowerCase()) ||
+                  log.absTime.toLowerCase().includes(activitySearch.toLowerCase()) ||
+                  log.status.toLowerCase().includes(activitySearch.toLowerCase());
                 const matchesBucket = selectedBucketIdx === null || log.bucketIdx === selectedBucketIdx;
 
                 return matchesLevel && matchesSearch && matchesBucket;
@@ -1205,42 +1395,102 @@ export function WorkRequestDetailModal() {
 
                     {/* LEFT PANE: SPARKLINE TELEMETRY & INTERVAL SELECTOR */}
                     <div className="lg:col-span-5 space-y-4 bg-gray-950/70 border border-gray-800 rounded-lg p-4">
-                      <div className="flex items-center justify-between border-b border-gray-800 pb-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-800 pb-2.5">
                         <div className="flex items-center space-x-2">
-                          <span className="p-1.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">
-                            <TrendingUp className="w-4 h-4" />
+                          <span className={cn(
+                            "p-1.5 rounded border transition-colors",
+                            sparklineMetric === 'throughput' 
+                              ? "bg-blue-500/10 border-blue-500/20 text-blue-400"
+                              : "bg-purple-500/10 border-purple-500/20 text-purple-400"
+                          )}>
+                            {sparklineMetric === 'throughput' ? <TrendingUp className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
                           </span>
                           <div>
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-gray-200">Telemetry Rate Sparkline</h4>
-                            <p className="text-[10px] text-gray-400">Log events density over T-30m window</p>
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-gray-200">
+                              {sparklineMetric === 'throughput' ? 'Telemetry Rate Sparkline' : 'Step Latency Sparkline'}
+                            </h4>
+                            <p className="text-[10px] text-gray-400">
+                              {sparklineMetric === 'throughput' ? 'Log events density over T-30m' : 'Step execution latency (ms)'}
+                            </p>
                           </div>
                         </div>
 
-                        {selectedBucketIdx !== null && (
-                          <button 
-                            onClick={() => setSelectedBucketIdx(null)}
-                            className="text-[10px] text-purple-400 hover:text-purple-300 font-mono font-bold flex items-center gap-1 bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                            <span>Reset</span>
-                          </button>
-                        )}
+                        <div className="flex items-center space-x-2">
+                          {/* Throughput / Latency Metric Toggle */}
+                          <div className="flex items-center bg-gray-900 p-0.5 rounded-md border border-gray-800 text-[10px] font-mono">
+                            <button
+                              onClick={() => setSparklineMetric('throughput')}
+                              className={cn(
+                                "px-2 py-0.5 rounded flex items-center space-x-1 font-bold transition-all",
+                                sparklineMetric === 'throughput' 
+                                  ? "bg-blue-950 text-blue-300 border border-blue-700 shadow-sm" 
+                                  : "text-gray-400 hover:text-gray-200"
+                              )}
+                              title="Visualize log throughput rate"
+                            >
+                              <TrendingUp className="w-3 h-3" />
+                              <span>Rate</span>
+                            </button>
+                            <button
+                              onClick={() => setSparklineMetric('latency')}
+                              className={cn(
+                                "px-2 py-0.5 rounded flex items-center space-x-1 font-bold transition-all",
+                                sparklineMetric === 'latency' 
+                                  ? "bg-purple-950 text-purple-300 border border-purple-700 shadow-sm" 
+                                  : "text-gray-400 hover:text-gray-200"
+                              )}
+                              title="Visualize step execution latency"
+                            >
+                              <Zap className="w-3 h-3" />
+                              <span>Latency</span>
+                            </button>
+                          </div>
+
+                          {selectedBucketIdx !== null && (
+                            <button 
+                              onClick={() => setSelectedBucketIdx(null)}
+                              className="text-[10px] text-purple-400 hover:text-purple-300 font-mono font-bold flex items-center gap-1 bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800 shrink-0"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span>Reset</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Sparkline Metrics summary */}
                       <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
-                        <div className="bg-gray-900/90 p-2 rounded border border-gray-800">
-                          <span className="text-gray-500 text-[9px] block">TOTAL LOGS</span>
-                          <span className="font-bold text-gray-100 text-sm">{totalLogCount}</span>
-                        </div>
-                        <div className="bg-gray-900/90 p-2 rounded border border-gray-800">
-                          <span className="text-gray-500 text-[9px] block">PEAK RATE</span>
-                          <span className="font-bold text-blue-400 text-sm">{maxBucketCount}/min</span>
-                        </div>
-                        <div className="bg-gray-900/90 p-2 rounded border border-gray-800">
-                          <span className="text-gray-500 text-[9px] block">AVG VELOCITY</span>
-                          <span className="font-bold text-cyan-400 text-sm">{avgLogRate}/int</span>
-                        </div>
+                        {sparklineMetric === 'throughput' ? (
+                          <>
+                            <div className="bg-gray-900/90 p-2 rounded border border-gray-800">
+                              <span className="text-gray-500 text-[9px] block uppercase">Total Logs</span>
+                              <span className="font-bold text-gray-100 text-sm">{totalLogCount}</span>
+                            </div>
+                            <div className="bg-gray-900/90 p-2 rounded border border-gray-800">
+                              <span className="text-gray-500 text-[9px] block uppercase">Peak Rate</span>
+                              <span className="font-bold text-blue-400 text-sm">{maxBucketCount}/min</span>
+                            </div>
+                            <div className="bg-gray-900/90 p-2 rounded border border-gray-800">
+                              <span className="text-gray-500 text-[9px] block uppercase">Avg Velocity</span>
+                              <span className="font-bold text-cyan-400 text-sm">{avgLogRate}/int</span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="bg-gray-900/90 p-2 rounded border border-gray-800">
+                              <span className="text-gray-500 text-[9px] block uppercase">Avg Latency</span>
+                              <span className="font-bold text-purple-300 text-sm">{avgLatencyMs}ms</span>
+                            </div>
+                            <div className="bg-gray-900/90 p-2 rounded border border-gray-800">
+                              <span className="text-gray-500 text-[9px] block uppercase">Peak Latency</span>
+                              <span className="font-bold text-amber-400 text-sm">{maxLatencyMs}ms</span>
+                            </div>
+                            <div className="bg-gray-900/90 p-2 rounded border border-gray-800">
+                              <span className="text-gray-500 text-[9px] block uppercase">Min Latency</span>
+                              <span className="font-bold text-emerald-400 text-sm">{minLatencyMs}ms</span>
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* Interactive Sparkline Canvas */}
@@ -1250,10 +1500,20 @@ export function WorkRequestDetailModal() {
                           className="w-full h-28 overflow-visible cursor-pointer"
                         >
                           <defs>
-                            <linearGradient id={`sparkline-grad-${detail.id}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.45" />
-                              <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.1" />
-                              <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+                            <linearGradient id={`sparkline-grad-${detail.id}-${sparklineMetric}`} x1="0" y1="0" x2="0" y2="1">
+                              {sparklineMetric === 'throughput' ? (
+                                <>
+                                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.45" />
+                                  <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.1" />
+                                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+                                </>
+                              ) : (
+                                <>
+                                  <stop offset="0%" stopColor="#a855f7" stopOpacity="0.45" />
+                                  <stop offset="60%" stopColor="#a855f7" stopOpacity="0.1" />
+                                  <stop offset="100%" stopColor="#a855f7" stopOpacity="0.0" />
+                                </>
+                              )}
                             </linearGradient>
                           </defs>
 
@@ -1276,14 +1536,14 @@ export function WorkRequestDetailModal() {
                           {/* Gradient Area Fill */}
                           <path 
                             d={areaPath} 
-                            fill={`url(#sparkline-grad-${detail.id})`} 
+                            fill={`url(#sparkline-grad-${detail.id}-${sparklineMetric})`} 
                           />
 
                           {/* Main Sparkline Stroke */}
                           <path 
                             d={linePath} 
                             fill="none" 
-                            stroke="#38bdf8" 
+                            stroke={sparklineMetric === 'throughput' ? "#38bdf8" : "#c084fc"} 
                             strokeWidth="2.5" 
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -1296,7 +1556,7 @@ export function WorkRequestDetailModal() {
                               y1={padY} 
                               x2={(activeHoverPoint || points[selectedBucketIdx!]).x} 
                               y2={padY + graphHeight} 
-                              stroke={selectedBucketIdx !== null ? "#a855f7" : "#60a5fa"} 
+                              stroke={selectedBucketIdx !== null ? "#a855f7" : sparklineMetric === 'throughput' ? "#60a5fa" : "#c084fc"} 
                               strokeWidth="1.5"
                               strokeDasharray="3 3"
                               opacity="0.9"
@@ -1325,8 +1585,8 @@ export function WorkRequestDetailModal() {
                                   cx={pt.x} 
                                   cy={pt.y} 
                                   r={isSelected ? 6 : isHovered ? 5 : 3} 
-                                  fill={isSelected ? "#a855f7" : isHovered ? "#38bdf8" : "#1e293b"} 
-                                  stroke={isSelected ? "#ffffff" : isHovered ? "#ffffff" : "#60a5fa"} 
+                                  fill={isSelected ? "#a855f7" : isHovered ? (sparklineMetric === 'throughput' ? "#38bdf8" : "#e9d5ff") : "#1e293b"} 
+                                  stroke={isSelected ? "#ffffff" : isHovered ? "#ffffff" : (sparklineMetric === 'throughput' ? "#60a5fa" : "#c084fc")} 
                                   strokeWidth={isSelected || isHovered ? 2 : 1.5}
                                   className="transition-all duration-150"
                                 />
@@ -1337,7 +1597,7 @@ export function WorkRequestDetailModal() {
                                     cy={pt.y} 
                                     r="9" 
                                     fill="none" 
-                                    stroke={isSelected ? "#a855f7" : "#38bdf8"} 
+                                    stroke={isSelected ? "#a855f7" : (sparklineMetric === 'throughput' ? "#38bdf8" : "#c084fc")} 
                                     strokeWidth="1"
                                     className="animate-ping opacity-60"
                                   />
@@ -1364,7 +1624,9 @@ export function WorkRequestDetailModal() {
                                   isSelected 
                                     ? "bg-purple-900/90 text-purple-200 border-purple-500 font-bold"
                                     : isHovered
-                                    ? "bg-blue-900/60 text-blue-200 border-blue-500"
+                                    ? sparklineMetric === 'throughput'
+                                      ? "bg-blue-900/60 text-blue-200 border-blue-500"
+                                      : "bg-purple-900/60 text-purple-200 border-purple-500"
                                     : "bg-gray-900 text-gray-500 border-gray-800 hover:text-gray-300"
                                 )}
                               >
@@ -1380,7 +1642,12 @@ export function WorkRequestDetailModal() {
                         {selectedBucketIdx !== null ? (
                           <span className="text-purple-300 flex items-center gap-1.5 font-bold">
                             <Filter className="w-3 h-3 text-purple-400" />
-                            Interval: {sparklineBuckets[selectedBucketIdx].label} ({sparklineBuckets[selectedBucketIdx].count} events)
+                            Interval: {sparklineBuckets[selectedBucketIdx].label} (
+                              {sparklineMetric === 'throughput' 
+                                ? `${sparklineBuckets[selectedBucketIdx].count} events`
+                                : `Latency: ${sparklineBuckets[selectedBucketIdx].latencyMs}ms`
+                              }
+                            )
                           </span>
                         ) : (
                           <span className="text-gray-500 italic">Click point on chart to filter log pane to interval</span>
@@ -1406,9 +1673,41 @@ export function WorkRequestDetailModal() {
                           </div>
                         </div>
 
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-900 border border-gray-800 text-gray-300 font-bold">
-                          {filteredAuditLogs.length} / {auditLogs.length} events
-                        </span>
+                        <div className="flex items-center space-x-2">
+                          {/* Relative / Absolute Toggle */}
+                          <div className="flex items-center bg-gray-900 p-0.5 rounded-md border border-gray-800 text-[10px] font-mono">
+                            <button
+                              onClick={() => setTimestampMode('relative')}
+                              className={cn(
+                                "px-2 py-0.5 rounded flex items-center space-x-1 transition-colors font-bold",
+                                timestampMode === 'relative' 
+                                  ? "bg-purple-900 text-purple-200 border border-purple-700" 
+                                  : "text-gray-400 hover:text-gray-200"
+                              )}
+                              title="Display relative timestamps (e.g. 2m ago)"
+                            >
+                              <Clock className="w-3 h-3" />
+                              <span>Relative</span>
+                            </button>
+                            <button
+                              onClick={() => setTimestampMode('absolute')}
+                              className={cn(
+                                "px-2 py-0.5 rounded flex items-center space-x-1 transition-colors font-bold",
+                                timestampMode === 'absolute' 
+                                  ? "bg-purple-900 text-purple-200 border border-purple-700" 
+                                  : "text-gray-400 hover:text-gray-200"
+                              )}
+                              title="Display absolute timestamps (e.g. 12:45:10 PM)"
+                            >
+                              <Calendar className="w-3 h-3" />
+                              <span>Absolute</span>
+                            </button>
+                          </div>
+
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-900 border border-gray-800 text-gray-300 font-bold shrink-0">
+                            {filteredAuditLogs.length} / {auditLogs.length}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Filters bar */}
@@ -1462,6 +1761,8 @@ export function WorkRequestDetailModal() {
                             const isExpanded = expandedLogId === log.id;
                             const isBucketMatch = (hoveredBucketIdx !== null && log.bucketIdx === hoveredBucketIdx) || 
                               (selectedBucketIdx !== null && log.bucketIdx === selectedBucketIdx);
+                            const statusBadge = getLogStatusBadge(log.status);
+                            const StatusIcon = statusBadge.icon;
 
                             return (
                               <div
@@ -1473,11 +1774,24 @@ export function WorkRequestDetailModal() {
                                     : "bg-gray-900/80 border-gray-800/80 hover:border-gray-700"
                                 )}
                               >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-1.5 min-w-0">
-                                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-gray-950 text-gray-400 border border-gray-800 shrink-0">
-                                      {log.time}
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center space-x-1.5 min-w-0 flex-wrap gap-y-1">
+                                    <span 
+                                      className="text-[10px] px-1.5 py-0.2 rounded bg-gray-950 text-gray-300 border border-gray-800 shrink-0 font-mono font-medium"
+                                      title={timestampMode === 'relative' ? `Absolute time: ${log.absTime}` : `Relative time: ${log.relTime}`}
+                                    >
+                                      {log.displayTime}
                                     </span>
+
+                                    {/* Visual Outcome Status Badge */}
+                                    <span className={cn(
+                                      "text-[9px] px-2 py-0.5 rounded-full font-bold shrink-0 border flex items-center gap-1 font-sans uppercase tracking-wider",
+                                      statusBadge.bg
+                                    )}>
+                                      <StatusIcon className="w-3 h-3 shrink-0" />
+                                      <span>{statusBadge.label}</span>
+                                    </span>
+
                                     <span className={cn(
                                       "text-[9px] px-1.5 py-0.2 rounded uppercase font-bold shrink-0 border",
                                       log.level === 'success' ? "bg-emerald-950 text-emerald-300 border-emerald-800" :
@@ -1487,9 +1801,11 @@ export function WorkRequestDetailModal() {
                                     )}>
                                       {log.level}
                                     </span>
+
                                     <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-950/60 text-purple-300 border border-purple-800 font-bold shrink-0">
                                       [{log.agent}]
                                     </span>
+
                                     <span className="text-xs font-bold text-gray-200 truncate">{log.action}</span>
                                   </div>
 
@@ -1507,7 +1823,7 @@ export function WorkRequestDetailModal() {
                                 {isExpanded && (
                                   <div className="p-2 bg-gray-950 rounded border border-gray-800 text-[10px] text-emerald-400 overflow-x-auto space-y-1">
                                     <span className="text-gray-500 text-[9px] block uppercase font-bold">Log Metadata</span>
-                                    <pre>{JSON.stringify(log.metadata, null, 2)}</pre>
+                                    <pre>{JSON.stringify({ status: log.status, ...log.metadata }, null, 2)}</pre>
                                   </div>
                                 )}
                               </div>

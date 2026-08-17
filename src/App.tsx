@@ -13,36 +13,49 @@ import { AgentConfigModal } from './components/AgentConfigModal';
 import { AgentDependencyGraphModal } from './components/AgentDependencyGraphModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { WorkRequestDetailModal } from './components/WorkRequestDetailModal';
+import { OnboardingModal } from './components/OnboardingModal';
+import { PerformanceAlertsModal } from './components/PerformanceAlertsModal';
+import { AgentActivityHeatmapModal } from './components/AgentActivityHeatmapModal';
+import { AgentTaskQueuePanel } from './components/AgentTaskQueuePanel';
+import { AgentTaskQueueModal } from './components/AgentTaskQueueModal';
 import { useSimulation } from './hooks/useSimulation';
 
 export default function App() {
-  const { theme } = useSimulation();
+  const { theme, layoutConfig } = useSimulation();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  const isQueueView = layoutConfig.mode === 'queue' || layoutConfig.showTaskQueue;
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-950 font-sans overflow-hidden text-gray-100 relative">
       <TopBar />
       
       <div className="flex-1 flex overflow-hidden relative">
-        <WorkRequestList />
+        {layoutConfig.showWorkRequests && <WorkRequestList />}
         
         <div className="flex-1 flex flex-col overflow-hidden">
-          <StateTimeline />
+          {layoutConfig.showTimeline && <StateTimeline />}
 
           {/* Main IDE Area */}
           <div className="flex-1 flex overflow-hidden">
-            <PlanView />
-            <ExecutionView />
+            {isQueueView ? (
+              <AgentTaskQueuePanel />
+            ) : (
+              <>
+                <PlanView />
+                <ExecutionView />
+              </>
+            )}
           </div>
           
           {/* Bottom Panel */}
-          <TerminalPanel />
+          {layoutConfig.showTerminal && <TerminalPanel />}
         </div>
 
-        <FileTreeSidebar />
+        {layoutConfig.showFileTree && <FileTreeSidebar />}
         <AgentLogDrawer />
         <ToastContainer />
         <RoundtableModal />
@@ -50,10 +63,15 @@ export default function App() {
         <AgentDependencyGraphModal />
         <KeyboardShortcutsModal />
         <WorkRequestDetailModal />
+        <OnboardingModal />
+        <PerformanceAlertsModal />
+        <AgentActivityHeatmapModal />
+        <AgentTaskQueueModal />
       </div>
     </div>
   );
 }
+
 
 
 
