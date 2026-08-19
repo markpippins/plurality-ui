@@ -3,7 +3,7 @@ import { useSimulation } from '../hooks/useSimulation';
 import { 
   Clock, Zap, Activity, Cpu, CheckCircle2, 
   RotateCcw, BarChart3, TrendingUp, Sparkles, Layers,
-  ChevronRight, ArrowUpRight, ShieldCheck, TerminalSquare, LineChart, Bell, Flame
+  ChevronRight, ArrowUpRight, ShieldCheck, TerminalSquare, LineChart, Bell, Flame, LayoutTemplate
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { AgentMetricItem, TaskMetricRecord } from '../types';
@@ -27,7 +27,8 @@ export function AgentMetricsWidget({
     openPerformanceAlertsModal,
     openHeatmapModal,
     alertRules,
-    alertHistory
+    alertHistory,
+    setLayoutMode
   } = useSimulation();
   const [selectedTab, setSelectedTab] = useState<'trends' | 'agents' | 'history' | 'tokens'>('trends');
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
@@ -249,6 +250,16 @@ export function AgentMetricsWidget({
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Full View Mode Button */}
+          <button
+            onClick={() => setLayoutMode('metrics')}
+            className="px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 border border-indigo-700/80 bg-indigo-950/80 hover:bg-indigo-900 text-indigo-200 hover:text-white transition-all shadow-xs"
+            title="Promote Agent Metrics to Dedicated Full-Workspace View Mode"
+          >
+            <LayoutTemplate className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Full View Mode</span>
+          </button>
+
           {/* Global Agent Activity Heatmap D3 Modal */}
           <button
             onClick={() => openHeatmapModal()}

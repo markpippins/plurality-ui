@@ -3,7 +3,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import { BackendService } from '../services/SimulatedBackendService';
-import { TerminalSquare, ChevronDown, ChevronUp, Trash2, Activity, Gauge, BarChart2, Maximize2, Minimize2 } from 'lucide-react';
+import { TerminalSquare, ChevronDown, ChevronUp, Trash2, Activity, Gauge, BarChart2, Maximize2, Minimize2, LayoutTemplate } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { AgentMetricsWidget } from './AgentMetricsWidget';
 
@@ -185,8 +185,22 @@ export function TerminalPanel() {
           <AgentMetricsWidget compact />
         </div>
 
-        {/* Right: Controls (Clear, Expand Height, Collapse) */}
+        {/* Right: Controls (Full View, Clear, Expand Height, Collapse) */}
         <div className="flex items-center space-x-1.5">
+          {!isCollapsed && activeTab === 'metrics' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                BackendService.setLayoutMode('metrics');
+              }}
+              className="px-2 py-0.5 rounded text-indigo-300 hover:text-white bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/60 transition-colors flex items-center gap-1 text-[11px] font-medium"
+              title="Promote Agent Metrics to Dedicated Full-Workspace View Mode"
+            >
+              <LayoutTemplate className="w-3.5 h-3.5" />
+              <span>Full View Mode</span>
+            </button>
+          )}
+
           {!isCollapsed && activeTab === 'terminal' && (
             <button
               onClick={handleClearTerminal}

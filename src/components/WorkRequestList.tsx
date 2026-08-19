@@ -3,7 +3,7 @@ import { useSimulation } from '../hooks/useSimulation';
 import { 
   Target, ChevronRight, ChevronDown, Plus, ExternalLink, FileText, Filter, 
   AlertCircle, CheckCircle2, Clock, PlayCircle, GripVertical, ArrowUp, ArrowDown, ArrowUpDown,
-  Flame, Minus, Check, X, Sparkles, Layers, Tag
+  Flame, Minus, Check, X, Sparkles, Layers, Tag, Shield, Moon, Sun, Sliders
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { WorkRequest, TaskPriority } from '../types';
@@ -41,7 +41,7 @@ function getWorkRequestStatusCategory(wr: WorkRequest): 'pending' | 'active' | '
 }
 
 export function WorkRequestList() {
-  const { workRequests, activeWorkRequest, BackendService, openWorkRequestDetailModal, addToast } = useSimulation();
+  const { workRequests, activeWorkRequest, BackendService, openWorkRequestDetailModal, addToast, theme, setTheme } = useSimulation();
   const [collapsed, setCollapsed] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<FilterStatus>('all');
   const [selectedPriorityFilter, setSelectedPriorityFilter] = useState<FilterPriority>('all');
@@ -230,9 +230,33 @@ export function WorkRequestList() {
 
   if (collapsed) {
     return (
-      <div className="w-12 h-full border-r border-gray-800 bg-gray-900/50 flex flex-col items-center py-4 cursor-pointer" onClick={() => setCollapsed(false)}>
-        <ChevronRight className="w-5 h-5 text-gray-400 mb-4" />
-        <Target className="w-5 h-5 text-gray-500" />
+      <div className="w-12 h-full border-r border-gray-800 bg-gray-900/50 flex flex-col items-center justify-between py-3 select-none">
+        <div className="flex flex-col items-center space-y-3 cursor-pointer" onClick={() => setCollapsed(false)}>
+          <ChevronRight className="w-5 h-5 text-gray-400 hover:text-white transition-colors" />
+          <Target className="w-5 h-5 text-gray-500 hover:text-blue-400 transition-colors" />
+        </div>
+
+        {/* Collapsed Theme Selector Icon Quick Cycle */}
+        <div className="flex flex-col items-center space-y-1 bg-gray-950/90 p-1 rounded-lg border border-gray-800">
+          <button
+            onClick={() => {
+              if (theme === 'steel') setTheme('dark');
+              else if (theme === 'dark') setTheme('light');
+              else setTheme('steel');
+            }}
+            className={cn(
+              "p-1.5 rounded transition-all",
+              theme === 'steel' && "bg-blue-600 text-white shadow-sm",
+              theme === 'dark' && "bg-purple-600 text-white shadow-sm",
+              theme === 'light' && "bg-amber-500 text-gray-950 shadow-sm font-bold"
+            )}
+            title={`Current Theme: ${theme.toUpperCase()} (Click to cycle Steel → Dark → Light)`}
+          >
+            {theme === 'steel' && <Shield className="w-3.5 h-3.5 text-blue-200" />}
+            {theme === 'dark' && <Moon className="w-3.5 h-3.5 text-purple-200" />}
+            {theme === 'light' && <Sun className="w-3.5 h-3.5 text-gray-950" />}
+          </button>
+        </div>
       </div>
     );
   }
@@ -658,6 +682,62 @@ export function WorkRequestList() {
             );
           })
         )}
+      </div>
+
+      {/* Theme Selector Footer at Bottom of Left Nav */}
+      <div className="p-2.5 border-t border-gray-800/80 bg-gray-950/80 shrink-0 select-none">
+        <div className="flex items-center justify-between px-1 mb-1.5">
+          <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold flex items-center gap-1.5">
+            <Sliders className="w-3 h-3 text-gray-400" />
+            <span>Theme Mode</span>
+          </span>
+          <span className="text-[9px] font-mono text-gray-400 uppercase font-semibold bg-gray-900 px-1.5 py-0.5 rounded border border-gray-800">
+            {theme}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-1 bg-gray-900/90 p-1 rounded-lg border border-gray-800/90 shadow-inner">
+          <button
+            onClick={() => setTheme('steel')}
+            className={cn(
+              "flex items-center justify-center space-x-1.5 py-1.5 px-1 rounded text-xs font-semibold transition-all",
+              theme === 'steel'
+                ? "bg-blue-600 text-white shadow-sm border border-blue-500/50"
+                : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
+            )}
+            title="Steel Theme (Cool slate & steel workspace atmosphere)"
+          >
+            <Shield className="w-3.5 h-3.5 text-blue-300" />
+            <span className="text-[11px]">Steel</span>
+          </button>
+
+          <button
+            onClick={() => setTheme('dark')}
+            className={cn(
+              "flex items-center justify-center space-x-1.5 py-1.5 px-1 rounded text-xs font-semibold transition-all",
+              theme === 'dark'
+                ? "bg-purple-600 text-white shadow-sm border border-purple-500/50"
+                : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
+            )}
+            title="Obsidian Dark Theme (Deep pitch black workspace atmosphere)"
+          >
+            <Moon className="w-3.5 h-3.5 text-purple-300" />
+            <span className="text-[11px]">Dark</span>
+          </button>
+
+          <button
+            onClick={() => setTheme('light')}
+            className={cn(
+              "flex items-center justify-center space-x-1.5 py-1.5 px-1 rounded text-xs font-semibold transition-all",
+              theme === 'light'
+                ? "bg-amber-500 text-gray-950 font-bold shadow-sm border border-amber-400"
+                : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
+            )}
+            title="Light Theme (Clean high-contrast operational surface)"
+          >
+            <Sun className="w-3.5 h-3.5 text-amber-500" />
+            <span className="text-[11px]">Light</span>
+          </button>
+        </div>
       </div>
     </div>
   );

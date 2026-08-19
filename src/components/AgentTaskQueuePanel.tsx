@@ -1,16 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSimulation } from '../hooks/useSimulation';
 import { 
   ListTodo, Play, Pause, RotateCcw, CheckCircle2, Trash2, Plus, 
   Search, Filter, Layers, Split, Code2, Clock, Zap, ArrowRight,
   Maximize2, Activity, Check, Sparkles, ChevronRight, AlertCircle, 
-  Terminal, ShieldCheck, FileText, Cpu, LayoutGrid, ListFilter
+  Terminal, ShieldCheck, FileText, Cpu, LayoutGrid, ListFilter,
+  GripVertical, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { AgentTaskItem } from '../types';
 import { AgentTaskDetailModal } from './AgentTaskDetailModal';
 import { CreateAgentTaskModal } from './CreateAgentTaskModal';
+import { TaskTimeProgress } from './TaskTimeProgress';
 
 export function AgentTaskQueuePanel() {
   const {
@@ -26,7 +28,10 @@ export function AgentTaskQueuePanel() {
     clearCompletedTasks,
     resetTaskQueueToDefault,
     setSelectedTaskForDetail,
-    selectedTaskForDetail
+    selectedTaskForDetail,
+    reorderPendingTasks,
+    updateTaskPriority,
+    sortPendingTasksByPriority
   } = useSimulation();
 
   const [viewFormat, setViewFormat] = useState<'kanban' | 'list'>('kanban');
@@ -35,6 +40,27 @@ export function AgentTaskQueuePanel() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'active' | 'completed' | 'paused'>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // Drag and drop state for pending tasks reordering
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<'above' | 'below' | null>(null);
+
+  // Table Priority Popover State
+  const [activePriorityMenuId, setActivePriorityMenuId] = useState<string | null>(null);
+  const priorityMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (priorityMenuRef.current && !priorityMenuRef.current.contains(e.target as Node)) {
+        setActivePriorityMenuId(null);
+      }
+    };
+    if (activePriorityMenuId) {
+      document.addEventListener('mousedown', handleOutsideClick);
+      return () => document.removeEventListener('mousedown', handleOutsideClick);
+    }
+  }, [activePriorityMenuId]);
 
   const stats = useMemo(() => getTaskQueueStats(), [agentTaskQueue]);
 
@@ -83,6 +109,53 @@ export function AgentTaskQueuePanel() {
     if (nextPending) {
       startTaskExecution(nextPending.id);
     }
+  };
+
+  // Drag & Drop handlers for pending tasks
+  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', taskId);
+    setDraggedTaskId(taskId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetTaskId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    if (draggedTaskId === targetTaskId) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const position = e.clientY < midY ? 'above' : 'below';
+
+    setDragOverTaskId(targetTaskId);
+    setDropPosition(position);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    const currentTarget = e.currentTarget;
+    const relatedTarget = e.relatedTarget as Node | null;
+    if (!currentTarget.contains(relatedTarget)) {
+      setDragOverTaskId(null);
+      setDropPosition(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetTaskId: string) => {
+    e.preventDefault();
+    if (draggedTaskId && draggedTaskId !== targetTaskId) {
+      reorderPendingTasks(draggedTaskId, targetTaskId, dropPosition || 'above');
+    }
+    setDraggedTaskId(null);
+    setDragOverTaskId(null);
+    setDropPosition(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTaskId(null);
+    setDragOverTaskId(null);
+    setDropPosition(null);
   };
 
   return (
@@ -348,17 +421,51 @@ export function AgentTaskQueuePanel() {
           /* Kanban View: 3 Columns */
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
             
-            {/* Column 1: Pending */}
-            <div className="bg-gray-900/50 border border-gray-800/80 rounded-xl flex flex-col overflow-hidden">
+            {/* Column 1: Pending (With Drag & Drop Priority Reordering) */}
+            <div className="bg-gray-900/50 border border-amber-900/40 rounded-xl flex flex-col overflow-hidden">
               <div className="px-3.5 py-2.5 border-b border-gray-800 bg-gray-900 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <span className="w-2 h-2 rounded-full bg-amber-400" />
                   <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">Pending Sub-Tasks</span>
                 </div>
-                <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">
-                  {pendingTasks.length}
-                </span>
+                
+                <div className="flex items-center space-x-1.5">
+                  {/* Quick Priority Sort Menu */}
+                  <div className="flex items-center space-x-1 bg-gray-950 p-0.5 rounded border border-gray-800">
+                    <button
+                      onClick={() => sortPendingTasksByPriority('desc')}
+                      className="px-1.5 py-0.5 rounded text-[10px] font-mono text-gray-400 hover:text-amber-300 hover:bg-gray-800 transition-colors flex items-center space-x-1"
+                      title="Sort pending tasks by priority (Critical → Low)"
+                    >
+                      <ArrowDown className="w-2.5 h-2.5 text-rose-400" />
+                      <span>Pri ↓</span>
+                    </button>
+                    <button
+                      onClick={() => sortPendingTasksByPriority('asc')}
+                      className="px-1.5 py-0.5 rounded text-[10px] font-mono text-gray-400 hover:text-blue-300 hover:bg-gray-800 transition-colors flex items-center space-x-1"
+                      title="Sort pending tasks by priority (Low → Critical)"
+                    >
+                      <ArrowUp className="w-2.5 h-2.5 text-blue-400" />
+                      <span>Pri ↑</span>
+                    </button>
+                  </div>
+
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">
+                    {pendingTasks.length}
+                  </span>
+                </div>
               </div>
+
+              {/* Drag reorder instructions hint */}
+              {pendingTasks.length > 1 && (
+                <div className="px-3 py-1.5 bg-amber-950/20 border-b border-amber-900/30 flex items-center justify-between text-[10px] text-amber-300/80">
+                  <span className="flex items-center space-x-1">
+                    <GripVertical className="w-3 h-3 text-amber-400/70" />
+                    <span>Drag cards to reorder priority sequence</span>
+                  </span>
+                  <span className="font-mono text-[9px] text-amber-400/60 font-semibold">Top = Next Executed</span>
+                </div>
+              )}
 
               <div className="flex-1 overflow-y-auto p-3 space-y-3">
                 {pendingTasks.length === 0 ? (
@@ -366,10 +473,21 @@ export function AgentTaskQueuePanel() {
                     No pending tasks in queue
                   </div>
                 ) : (
-                  pendingTasks.map(task => (
+                  pendingTasks.map((task, index) => (
                     <TaskCard 
                       key={task.id} 
                       task={task} 
+                      index={index}
+                      isPendingDraggable={true}
+                      isDragging={draggedTaskId === task.id}
+                      isDragOver={dragOverTaskId === task.id}
+                      dropPosition={dragOverTaskId === task.id ? dropPosition : null}
+                      onDragStart={(e) => handleDragStart(e, task.id)}
+                      onDragOver={(e) => handleDragOver(e, task.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, task.id)}
+                      onDragEnd={handleDragEnd}
+                      onPriorityChange={(newPri) => updateTaskPriority(task.id, newPri)}
                       onInspect={() => setSelectedTaskForDetail(task)}
                       onStart={() => startTaskExecution(task.id)}
                       onPause={() => pauseTask(task.id)}
@@ -405,6 +523,7 @@ export function AgentTaskQueuePanel() {
                     <TaskCard 
                       key={task.id} 
                       task={task} 
+                      onPriorityChange={(newPri) => updateTaskPriority(task.id, newPri)}
                       onInspect={() => setSelectedTaskForDetail(task)}
                       onStart={() => startTaskExecution(task.id)}
                       onPause={() => pauseTask(task.id)}
@@ -440,6 +559,7 @@ export function AgentTaskQueuePanel() {
                     <TaskCard 
                       key={task.id} 
                       task={task} 
+                      onPriorityChange={(newPri) => updateTaskPriority(task.id, newPri)}
                       onInspect={() => setSelectedTaskForDetail(task)}
                       onStart={() => startTaskExecution(task.id)}
                       onPause={() => pauseTask(task.id)}
@@ -455,11 +575,12 @@ export function AgentTaskQueuePanel() {
 
           </div>
         ) : (
-          /* List Matrix View */
+          /* List Matrix View with Drag and Drop on Pending Rows */
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto shadow-sm">
             <table className="w-full text-left text-xs">
               <thead className="bg-gray-950/80 text-[10px] uppercase font-bold text-gray-400 border-b border-gray-800 tracking-wider">
                 <tr>
+                  <th className="py-3 px-3 w-10 text-center">#</th>
                   <th className="py-3 px-4">Task ID & Title</th>
                   <th className="py-3 px-3">Assignee Agent</th>
                   <th className="py-3 px-3">Priority</th>
@@ -470,16 +591,61 @@ export function AgentTaskQueuePanel() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/60 font-sans">
-                {filteredTasks.map(task => {
+                {filteredTasks.map((task, index) => {
                   const isArch = task.assignedAgent === 'architect';
+                  const isPending = task.status === 'pending';
                   const completedSubsteps = task.substeps.filter(s => s.status === 'completed').length;
+                  const isDraggingThis = draggedTaskId === task.id;
+                  const isOverThis = dragOverTaskId === task.id;
+
                   return (
-                    <tr key={task.id} className="hover:bg-gray-850/60 transition-colors group">
+                    <tr 
+                      key={task.id} 
+                      draggable={isPending}
+                      onDragStart={(e) => isPending && handleDragStart(e, task.id)}
+                      onDragOver={(e) => isPending && handleDragOver(e, task.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => isPending && handleDrop(e, task.id)}
+                      onDragEnd={handleDragEnd}
+                      className={cn(
+                        "transition-all group relative",
+                        isDraggingThis ? "opacity-30 bg-blue-950/30 border-2 border-dashed border-blue-400" :
+                        isOverThis && dropPosition === 'above' ? "border-t-2 border-blue-400 bg-blue-950/20" :
+                        isOverThis && dropPosition === 'below' ? "border-b-2 border-blue-400 bg-blue-950/20" :
+                        "hover:bg-gray-850/60"
+                      )}
+                    >
+                      {/* Drag Grip / Index Column */}
+                      <td className="py-3 px-3 text-center text-gray-500">
+                        {isPending ? (
+                          <div 
+                            className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-amber-400 transition-colors inline-flex items-center justify-center"
+                            title="Drag to reorder pending task priority sequence"
+                          >
+                            <GripVertical className="w-3.5 h-3.5" />
+                          </div>
+                        ) : (
+                          <span className="font-mono text-[10px] text-gray-600">{index + 1}</span>
+                        )}
+                      </td>
+
                       {/* ID & Title */}
                       <td className="py-3 px-4">
-                        <div className="font-mono text-[10px] text-gray-500 font-bold">{task.id}</div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-mono text-[10px] text-gray-500 font-bold">{task.id}</span>
+                          {isPending && (
+                            <span className="text-[9px] font-mono text-amber-400/70 bg-amber-950/60 px-1 py-0.2 rounded border border-amber-900/60">
+                              Seq #{index + 1}
+                            </span>
+                          )}
+                        </div>
                         <div className="font-semibold text-gray-100 mt-0.5 flex items-center space-x-1.5">
-                          <span>{task.title}</span>
+                          <span 
+                            onClick={() => setSelectedTaskForDetail(task)}
+                            className="hover:text-blue-300 cursor-pointer transition-colors"
+                          >
+                            {task.title}
+                          </span>
                           {task.codeSnippet && <Code2 className="w-3 h-3 text-emerald-400 shrink-0" />}
                         </div>
                         {task.outputs && task.outputs.length > 0 && (
@@ -501,17 +667,51 @@ export function AgentTaskQueuePanel() {
                         <div className="text-[10px] font-mono text-gray-500 mt-0.5">{task.model}</div>
                       </td>
 
-                      {/* Priority */}
-                      <td className="py-3 px-3">
-                        <span className={cn(
-                          "text-[10px] font-bold uppercase px-1.5 py-0.5 rounded",
-                          task.priority === 'critical' ? "bg-rose-950 text-rose-400" :
-                          task.priority === 'high' ? "bg-amber-950 text-amber-400" :
-                          task.priority === 'medium' ? "bg-blue-950 text-blue-400" :
-                          "bg-gray-800 text-gray-400"
-                        )}>
-                          {task.priority}
-                        </span>
+                      {/* Priority (Interactive Popover) */}
+                      <td className="py-3 px-3 relative">
+                        <div className="relative inline-block">
+                          <button
+                            onClick={() => setActivePriorityMenuId(activePriorityMenuId === task.id ? null : task.id)}
+                            className={cn(
+                              "text-[10px] font-bold uppercase px-2 py-0.5 rounded flex items-center space-x-1 transition-all hover:ring-1 hover:ring-gray-400",
+                              task.priority === 'critical' ? "bg-rose-950 text-rose-300 border border-rose-800" :
+                              task.priority === 'high' ? "bg-amber-950 text-amber-300 border border-amber-800" :
+                              task.priority === 'medium' ? "bg-blue-950 text-blue-300 border border-blue-800" :
+                              "bg-gray-800 text-gray-300 border border-gray-700"
+                            )}
+                            title="Click to adjust priority level"
+                          >
+                            <span>{task.priority}</span>
+                            <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                          </button>
+
+                          {activePriorityMenuId === task.id && (
+                            <div 
+                              ref={priorityMenuRef}
+                              className="absolute left-0 top-full mt-1 w-32 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 z-30 font-sans"
+                            >
+                              <div className="px-2 py-1 text-[9px] uppercase font-bold text-gray-500 border-b border-gray-800">
+                                Set Priority
+                              </div>
+                              {(['critical', 'high', 'medium', 'low'] as const).map(p => (
+                                <button
+                                  key={p}
+                                  onClick={() => {
+                                    updateTaskPriority(task.id, p);
+                                    setActivePriorityMenuId(null);
+                                  }}
+                                  className={cn(
+                                    "w-full text-left px-2 py-1.5 text-[11px] font-medium flex items-center justify-between hover:bg-gray-800 transition-colors",
+                                    task.priority === p ? "text-white font-bold bg-gray-800/80" : "text-gray-300"
+                                  )}
+                                >
+                                  <span className="capitalize">{p}</span>
+                                  {task.priority === p && <Check className="w-3 h-3 text-blue-400" />}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </td>
 
                       {/* Status & Progress */}
@@ -550,12 +750,10 @@ export function AgentTaskQueuePanel() {
                         <div className="text-[10px] text-gray-500">steps done</div>
                       </td>
 
-                      {/* Duration / Tokens */}
-                      <td className="py-3 px-3 font-mono text-[11px]">
-                        <div className="text-gray-300">
-                          {task.actualDurationMs ? `${task.actualDurationMs} ms` : `~${task.estimatedDurationMs} ms`}
-                        </div>
-                        <div className="text-[10px] text-gray-500">
+                      {/* Duration / Tokens & Time Progress */}
+                      <td className="py-3 px-3 min-w-[140px]">
+                        <TaskTimeProgress task={task} mode="table" />
+                        <div className="text-[10px] text-gray-500 font-mono mt-1">
                           {task.tokensUsed ? `${task.tokensUsed.toLocaleString()} tok` : '0 tok'}
                         </div>
                       </td>
@@ -626,8 +824,10 @@ export function AgentTaskQueuePanel() {
         )}
       </div>
 
-      {/* Modals */}
+      {/* Task Detail Modal */}
       <AgentTaskDetailModal />
+
+      {/* Create Task Modal */}
       <CreateAgentTaskModal 
         isOpen={isCreateModalOpen} 
         onClose={() => setIsCreateModalOpen(false)} 
@@ -636,10 +836,21 @@ export function AgentTaskQueuePanel() {
   );
 }
 
-// Sub-Component: Kanban Task Card
+// Sub-Component: Kanban Task Card with Drag and Drop Support
 interface TaskCardProps {
   key?: React.Key;
   task: AgentTaskItem;
+  index?: number;
+  isPendingDraggable?: boolean;
+  isDragging?: boolean;
+  isDragOver?: boolean;
+  dropPosition?: 'above' | 'below' | null;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragLeave?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent) => void;
+  onDragEnd?: () => void;
+  onPriorityChange?: (priority: AgentTaskItem['priority']) => void;
   onInspect: () => void;
   onStart: () => void;
   onPause: () => void;
@@ -651,6 +862,17 @@ interface TaskCardProps {
 
 function TaskCard({
   task,
+  index,
+  isPendingDraggable,
+  isDragging,
+  isDragOver,
+  dropPosition,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
+  onPriorityChange,
   onInspect,
   onStart,
   onPause,
@@ -660,21 +882,80 @@ function TaskCard({
   onDelete
 }: TaskCardProps) {
   const isArch = task.assignedAgent === 'architect';
+  const isPending = task.status === 'pending';
   const completedSubsteps = task.substeps.filter(s => s.status === 'completed').length;
   const runningSubstep = task.substeps.find(s => s.status === 'running');
 
+  const [isPriorityMenuOpen, setIsPriorityMenuOpen] = useState(false);
+  const cardPriorityRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (cardPriorityRef.current && !cardPriorityRef.current.contains(e.target as Node)) {
+        setIsPriorityMenuOpen(false);
+      }
+    };
+    if (isPriorityMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isPriorityMenuOpen]);
+
   return (
-    <div className={cn(
-      "p-3.5 rounded-xl border transition-all duration-200 group relative bg-gray-950/90 shadow-sm",
-      task.status === 'active' ? "border-cyan-500/70 shadow-cyan-950/50 ring-1 ring-cyan-500/30" :
-      task.status === 'completed' ? "border-emerald-800/50 hover:border-emerald-700/80" :
-      task.status === 'paused' ? "border-amber-700/60" :
-      "border-gray-800 hover:border-gray-700"
-    )}>
-      {/* Top Header: ID & Agent Role Pill */}
+    <div 
+      draggable={isPending && isPendingDraggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      className={cn(
+        "p-3.5 rounded-xl border transition-all duration-200 group relative bg-gray-950/90 shadow-sm",
+        isDragging ? "opacity-30 scale-[0.98] ring-2 ring-blue-500 border-dashed border-blue-400 bg-blue-950/20 cursor-grabbing" :
+        isDragOver && dropPosition === 'above' ? "border-t-4 border-t-blue-400 ring-2 ring-blue-500/40 bg-blue-950/30 -translate-y-0.5" :
+        isDragOver && dropPosition === 'below' ? "border-b-4 border-b-blue-400 ring-2 ring-blue-500/40 bg-blue-950/30 translate-y-0.5" :
+        task.status === 'active' ? "border-cyan-500/70 shadow-cyan-950/50 ring-1 ring-cyan-500/30" :
+        task.status === 'completed' ? "border-emerald-800/50 hover:border-emerald-700/80" :
+        task.status === 'paused' ? "border-amber-700/60" :
+        "border-gray-800 hover:border-gray-700"
+      )}
+    >
+      {/* Visual Drop Placement Marker Pills */}
+      {isDragOver && dropPosition === 'above' && (
+        <div className="absolute -top-3 left-4 px-2 py-0.5 bg-blue-600 text-white font-mono text-[9px] font-bold rounded shadow-lg flex items-center space-x-1 z-20 animate-bounce">
+          <ArrowUp className="w-2.5 h-2.5" />
+          <span>Insert Before (Higher Priority)</span>
+        </div>
+      )}
+
+      {isDragOver && dropPosition === 'below' && (
+        <div className="absolute -bottom-3 left-4 px-2 py-0.5 bg-blue-600 text-white font-mono text-[9px] font-bold rounded shadow-lg flex items-center space-x-1 z-20 animate-bounce">
+          <ArrowDown className="w-2.5 h-2.5" />
+          <span>Insert After (Lower Priority)</span>
+        </div>
+      )}
+
+      {/* Top Header: Drag Handle, ID & Agent Role Pill */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-1.5">
+          {/* Drag Grip Handle on Pending Cards */}
+          {isPending && isPendingDraggable && (
+            <div 
+              className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 text-gray-500 hover:text-amber-300 transition-colors"
+              title="Drag card to reorder execution priority"
+            >
+              <GripVertical className="w-3.5 h-3.5" />
+            </div>
+          )}
+
           <span className="font-mono text-[10px] font-bold text-gray-500">{task.id}</span>
+
+          {typeof index === 'number' && isPending && (
+            <span className="font-mono text-[9px] text-amber-400/80 bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-900/60">
+              #{index + 1}
+            </span>
+          )}
+
           <span className={cn(
             "text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border",
             isArch ? "bg-indigo-950 text-indigo-300 border-indigo-800" : "bg-teal-950 text-teal-300 border-teal-800"
@@ -683,15 +964,48 @@ function TaskCard({
           </span>
         </div>
 
-        <span className={cn(
-          "text-[9px] font-bold uppercase px-1.5 py-0.2 rounded",
-          task.priority === 'critical' ? "bg-rose-950 text-rose-400 border border-rose-900" :
-          task.priority === 'high' ? "bg-amber-950 text-amber-400 border border-amber-900" :
-          task.priority === 'medium' ? "bg-blue-950 text-blue-400 border border-blue-900" :
-          "bg-gray-900 text-gray-500"
-        )}>
-          {task.priority}
-        </span>
+        {/* Priority Badge with In-Place Quick Selector */}
+        <div className="relative" ref={cardPriorityRef}>
+          <button
+            onClick={() => setIsPriorityMenuOpen(!isPriorityMenuOpen)}
+            className={cn(
+              "text-[9px] font-bold uppercase px-2 py-0.5 rounded flex items-center space-x-1 transition-all hover:scale-105",
+              task.priority === 'critical' ? "bg-rose-950 text-rose-400 border border-rose-900" :
+              task.priority === 'high' ? "bg-amber-950 text-amber-400 border border-amber-900" :
+              task.priority === 'medium' ? "bg-blue-950 text-blue-400 border border-blue-900" :
+              "bg-gray-900 text-gray-500 border border-gray-800"
+            )}
+            title="Click to change task priority level"
+          >
+            <span>{task.priority}</span>
+            <ChevronDown className="w-2 h-2 opacity-60" />
+          </button>
+
+          {isPriorityMenuOpen && onPriorityChange && (
+            <div className="absolute right-0 top-full mt-1 w-32 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl py-1 z-30 font-sans">
+              <div className="px-2 py-1 text-[9px] uppercase font-bold text-gray-500 border-b border-gray-800">
+                Change Priority
+              </div>
+              {(['critical', 'high', 'medium', 'low'] as const).map(p => (
+                <button
+                  key={p}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPriorityChange(p);
+                    setIsPriorityMenuOpen(false);
+                  }}
+                  className={cn(
+                    "w-full text-left px-2.5 py-1.5 text-[11px] font-medium flex items-center justify-between hover:bg-gray-800 transition-colors",
+                    task.priority === p ? "text-white font-bold bg-gray-800/90" : "text-gray-300"
+                  )}
+                >
+                  <span className="capitalize">{p}</span>
+                  {task.priority === p && <Check className="w-3 h-3 text-blue-400" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Task Title */}
@@ -745,6 +1059,9 @@ function TaskCard({
           </div>
         )}
       </div>
+
+      {/* Elapsed vs Estimated Time Indicator & Progress Bar */}
+      <TaskTimeProgress task={task} mode="card" className="mt-2.5 pt-2 border-t border-gray-800/60" />
 
       {/* Outputs & Code Badge */}
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[10px] font-mono">

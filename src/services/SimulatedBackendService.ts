@@ -111,6 +111,17 @@ export const DEFAULT_LAYOUT_CONFIGS: Record<WorkspaceLayoutMode, WorkspaceLayout
     showTaskQueue: true,
     planPanelExpanded: false,
     executionPanelExpanded: false,
+  },
+  metrics: {
+    mode: 'metrics',
+    showWorkRequests: false,
+    showTimeline: true,
+    showTerminal: false,
+    showFileTree: false,
+    showLogDrawer: false,
+    showTaskQueue: false,
+    planPanelExpanded: false,
+    executionPanelExpanded: false,
   }
 };
 
@@ -1575,7 +1586,8 @@ export class SimulatedBackendService {
       execution: 'Execution & Code Mode',
       debugging: 'Debugging & Logs Mode',
       duality: '1:1 Duality Mode',
-      queue: 'Agent Task Queue Mode'
+      queue: 'Agent Task Queue Mode',
+      metrics: 'Agent Metrics & Lifecycle Mode'
     };
 
     this.addToast({
@@ -1731,6 +1743,100 @@ export class SimulatedBackendService {
     });
     this.agentTaskQueueSubject.next(updated);
     savePersistedTaskQueue(updated);
+  }
+
+  public reorderAgentTaskQueue(newQueue: AgentTaskItem[]) {
+    this.agentTaskQueueSubject.next(newQueue);
+    savePersistedTaskQueue(newQueue);
+  }
+
+  public updateTaskPriority(taskId: string, priority: AgentTaskItem['priority']) {
+    const queue = this.agentTaskQueueSubject.getValue();
+    const task = queue.find(t => t.id === taskId);
+    if (!task) return;
+
+    this.updateTaskInQueue(taskId, { priority });
+    this.addToast({
+      title: `Priority Updated: ${priority.toUpperCase()}`,
+      message: `Set "${task.title.slice(0, 30)}..." to ${priority} priority.`,
+      type: priority === 'critical' ? 'error' : priority === 'high' ? 'warn' : 'info'
+    });
+  }
+
+  public reorderPendingTasks(sourceTaskId: string, targetTaskId: string, position: 'above' | 'below' = 'above', syncPriorityWithTarget: boolean = false) {
+    if (sourceTaskId === targetTaskId) return;
+
+    const currentQueue = [...this.agentTaskQueueSubject.getValue()];
+    const sourceIndex = currentQueue.findIndex(t => t.id === sourceTaskId);
+    const targetIndex = currentQueue.findIndex(t => t.id === targetTaskId);
+
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const sourceTask = currentQueue[sourceIndex];
+    const targetTask = currentQueue[targetIndex];
+
+    // Remove source task
+    currentQueue.splice(sourceIndex, 1);
+
+    // Calculate insertion index
+    const newTargetIndex = currentQueue.findIndex(t => t.id === targetTaskId);
+    const insertIndex = position === 'above' ? newTargetIndex : newTargetIndex + 1;
+
+    const updatedSourceTask = { ...sourceTask };
+    if (syncPriorityWithTarget) {
+      updatedSourceTask.priority = targetTask.priority;
+    }
+
+    currentQueue.splice(insertIndex, 0, updatedSourceTask);
+
+    this.agentTaskQueueSubject.next(currentQueue);
+    savePersistedTaskQueue(currentQueue);
+
+    this.addAgentLog({
+      agentId: sourceTask.agentId,
+      agentName: sourceTask.agentName,
+      level: 'info',
+      action: 'TASK_REORDERED',
+      details: `Reordered pending task [${sourceTask.id}] "${sourceTask.title}" ${position} [${targetTask.id}] "${targetTask.title}".`,
+      metadata: { sourceTaskId, targetTaskId, position, newPriority: updatedSourceTask.priority }
+    });
+
+    this.terminalOutput$.next(`\x1b[36m[TASK QUEUE]\x1b[0m Reordered [${sourceTask.id}] ${position} [${targetTask.id}] (Priority: ${updatedSourceTask.priority.toUpperCase()})\r\n`);
+
+    this.addToast({
+      title: '↕️ Task Queue Reordered',
+      message: `Moved "${sourceTask.title.slice(0, 25)}..." ${position} "${targetTask.title.slice(0, 25)}..."`,
+      type: 'info'
+    });
+  }
+
+  public sortPendingTasksByPriority(order: 'desc' | 'asc' = 'desc') {
+    const priorityWeight: Record<AgentTaskItem['priority'], number> = {
+      critical: 4,
+      high: 3,
+      medium: 2,
+      low: 1
+    };
+
+    const currentQueue = this.agentTaskQueueSubject.getValue();
+    const pending = currentQueue.filter(t => t.status === 'pending');
+    const others = currentQueue.filter(t => t.status !== 'pending');
+
+    const sortedPending = [...pending].sort((a, b) => {
+      const weightA = priorityWeight[a.priority] || 2;
+      const weightB = priorityWeight[b.priority] || 2;
+      return order === 'desc' ? weightB - weightA : weightA - weightB;
+    });
+
+    const newQueue = [...sortedPending, ...others];
+    this.agentTaskQueueSubject.next(newQueue);
+    savePersistedTaskQueue(newQueue);
+
+    this.addToast({
+      title: '↕️ Priority Sort Applied',
+      message: `Pending sub-tasks sorted by priority (${order === 'desc' ? 'Critical → Low' : 'Low → Critical'}).`,
+      type: 'info'
+    });
   }
 
   public deleteTaskFromQueue(taskId: string) {

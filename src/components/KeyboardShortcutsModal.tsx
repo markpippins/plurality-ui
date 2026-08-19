@@ -17,6 +17,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     category: 'System & Overlays',
     items: [
       { keys: ['⌘K', 'Ctrl+K', '/'], description: 'Open Global Command Palette & Action Launcher', actionLabel: 'Command Palette' },
+      { keys: ['M'], description: 'Toggle Agent Metrics & Lifecycle Trends Workspace View Mode', actionLabel: 'Metrics View' },
       { keys: ['Q'], description: 'Open Agent Sub-Task Execution Queue (Architect & Builder)', actionLabel: 'Task Queue' },
       { keys: ['A'], description: 'Open Global Performance Threshold Alerts Config (Latency > 200ms)', actionLabel: 'Performance Alerts' },
       { keys: ['TOUR'], description: 'Launch Interactive Onboarding Layout & Workflow Tutorial', actionLabel: 'Onboarding Tour' },
@@ -89,6 +90,18 @@ export function KeyboardShortcutsModal() {
       if (e.key === '?' || (e.shiftKey && e.key === '/')) {
         e.preventDefault();
         toggleShortcutsModal();
+        return;
+      }
+
+      // 'm' or 'M' -> Toggle Agent Metrics & Lifecycle Trends View Mode
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        const currentMode = BackendService.getLayoutConfig().mode;
+        if (currentMode === 'metrics') {
+          BackendService.setLayoutMode('default');
+        } else {
+          BackendService.setLayoutMode('metrics');
+        }
         return;
       }
 

@@ -28,6 +28,7 @@ export function WorkspaceLayoutSelector() {
 
   const modes: { id: WorkspaceLayoutMode; label: string; icon: React.ComponentType<{ className?: string }>; desc: string }[] = [
     { id: 'default', label: 'Default', icon: Columns, desc: 'Balanced multi-pane IDE' },
+    { id: 'metrics', label: 'Metrics', icon: Activity, desc: 'Full-screen Agent Metrics, Lifecycle Trends & Recharts' },
     { id: 'analysis', label: 'Analysis', icon: FileText, desc: 'Focus on PlanIR, Intent, and Specs' },
     { id: 'execution', label: 'Execution', icon: Code2, desc: 'Focus on Code synthesis and Validation' },
     { id: 'debugging', label: 'Debugging', icon: Bug, desc: 'Maximized Logs and Terminal inspection' },

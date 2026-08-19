@@ -8,6 +8,7 @@ import {
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { AgentTaskItem } from '../types';
+import { TaskTimeProgress } from './TaskTimeProgress';
 
 export function AgentTaskDetailModal() {
   const { 
@@ -248,6 +249,9 @@ export function AgentTaskDetailModal() {
                   />
                 </div>
               </div>
+
+              {/* Elapsed Time vs Estimated Time Telemetry Progress Bar */}
+              <TaskTimeProgress task={task} mode="detailed" />
 
               {/* Execution Telemetry Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

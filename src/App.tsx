@@ -18,6 +18,7 @@ import { PerformanceAlertsModal } from './components/PerformanceAlertsModal';
 import { AgentActivityHeatmapModal } from './components/AgentActivityHeatmapModal';
 import { AgentTaskQueuePanel } from './components/AgentTaskQueuePanel';
 import { AgentTaskQueueModal } from './components/AgentTaskQueueModal';
+import { AgentMetricsDashboard } from './components/AgentMetricsDashboard';
 import { useSimulation } from './hooks/useSimulation';
 
 export default function App() {
@@ -27,7 +28,8 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  const isQueueView = layoutConfig.mode === 'queue' || layoutConfig.showTaskQueue;
+  const isMetricsView = layoutConfig.mode === 'metrics';
+  const isQueueView = (layoutConfig.mode === 'queue' || layoutConfig.showTaskQueue) && !isMetricsView;
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-950 font-sans overflow-hidden text-gray-100 relative">
@@ -41,7 +43,9 @@ export default function App() {
 
           {/* Main IDE Area */}
           <div className="flex-1 flex overflow-hidden">
-            {isQueueView ? (
+            {isMetricsView ? (
+              <AgentMetricsDashboard />
+            ) : isQueueView ? (
               <AgentTaskQueuePanel />
             ) : (
               <>

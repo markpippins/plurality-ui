@@ -181,7 +181,7 @@ export interface DualityState {
   performanceMetrics?: DualityPerformanceMetrics;
 }
 
-export type WorkspaceLayoutMode = 'default' | 'analysis' | 'execution' | 'debugging' | 'duality' | 'queue';
+export type WorkspaceLayoutMode = 'default' | 'analysis' | 'execution' | 'debugging' | 'duality' | 'queue' | 'metrics';
 
 export interface WorkspaceLayoutConfig {
   mode: WorkspaceLayoutMode;

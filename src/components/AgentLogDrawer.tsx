@@ -317,8 +317,6 @@ export function AgentLogDrawer() {
     });
     return counts;
   }, [agentSpecificLogs]);
-
-  if (!selectedAgent) return null;
   
   // Robust search & multi-dimensional filtering
   const filteredLogs = useMemo(() => {
@@ -859,13 +857,15 @@ export function AgentLogDrawer() {
 
   return (
     <AnimatePresence>
-      <motion.div 
-        initial={{ x: '100%', opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        exit={{ x: '100%', opacity: 0 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="fixed top-14 right-0 bottom-0 w-[480px] max-w-[94vw] bg-gray-950/95 backdrop-blur-md border-l border-gray-800 shadow-2xl flex flex-col z-50 font-sans"
-      >
+      {selectedAgent && (
+        <motion.div 
+          key={selectedAgent.id}
+          initial={{ x: '100%', opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: '100%', opacity: 0 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          className="fixed top-14 right-0 bottom-0 w-[480px] max-w-[94vw] bg-gray-950/95 backdrop-blur-md border-l border-gray-800 shadow-2xl flex flex-col z-50 font-sans"
+        >
         {/* Top Header - Selected Agent Info */}
         <div className="p-4 border-b border-gray-800 bg-gray-900/90 flex flex-col space-y-3 shrink-0">
           <div className="flex items-center justify-between">
@@ -1941,6 +1941,7 @@ export function AgentLogDrawer() {
           </span>
         </div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }
