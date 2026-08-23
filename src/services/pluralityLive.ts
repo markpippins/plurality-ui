@@ -16,6 +16,7 @@ export type PluralityMode = 'live' | 'mock';
 export interface UpstreamStatus {
   executionSrv: 'ok' | 'down';
   conduitSrv: 'ok' | 'down';
+  nebulaSrv: 'ok' | 'down';
 }
 
 export interface LiveStatus {
@@ -25,11 +26,14 @@ export interface LiveStatus {
   error: string | null;
 }
 
+// LAC (thread 83d2fd5c): env sole authority; mock = explicit VITE_PLURALITY_
+// MODE=mock; default live.
 export const pluralityMode: PluralityMode =
   (import.meta as any).env?.VITE_PLURALITY_MODE === 'mock' ? 'mock' : 'live';
 
 const EXECUTION_SRV_URL = (import.meta as any).env?.VITE_EXECUTION_SRV_URL || 'http://localhost:3110';
 const CONDUIT_SRV_URL = (import.meta as any).env?.VITE_CONDUIT_SRV_URL || 'http://localhost:3104';
+const NEBULA_SRV_URL = (import.meta as any).env?.VITE_NEBULA_SRV_URL || 'http://localhost:3101';
 
 export async function probeUpstreams(): Promise<UpstreamStatus> {
   const check = async (url: string): Promise<'ok' | 'down'> => {
@@ -43,11 +47,12 @@ export async function probeUpstreams(): Promise<UpstreamStatus> {
       return 'down';
     }
   };
-  const [executionSrv, conduitSrv] = await Promise.all([
+  const [executionSrv, conduitSrv, nebulaSrv] = await Promise.all([
     check(EXECUTION_SRV_URL),
     check(CONDUIT_SRV_URL),
+    check(NEBULA_SRV_URL),
   ]);
-  return { executionSrv, conduitSrv };
+  return { executionSrv, conduitSrv, nebulaSrv };
 }
 
 // Map a real execution-srv request row to the plurality WorkRequest shape.
@@ -92,4 +97,24 @@ export async function fetchLivePlans(): Promise<any[]> {
   return data?.workflows || [];
 }
 
-export { EXECUTION_SRV_URL, CONDUIT_SRV_URL };
+// Plans domain (LAC spec: plans → nebula-srv). Canonical implementation-plan
+// summaries for live surfaces; failures throw — never synthetic rows.
+export interface PlanSummary {
+  number: string;
+  title: string;
+  status: string | null;
+}
+
+export async function fetchLivePlanSummaries(limit = 50): Promise<PlanSummary[]> {
+  const res = await fetch(`${NEBULA_SRV_URL}/api/plans?pageSize=${limit}`);
+  if (!res.ok) throw new Error(`nebula-srv returned HTTP ${res.status}`);
+  const data = await res.json();
+  const items = Array.isArray(data?.items) ? data.items : [];
+  return items.map((p: any) => ({
+    number: String(p?.planNumber ?? p?.number ?? ''),
+    title: String(p?.title ?? ''),
+    status: p?.status ?? null,
+  }));
+}
+
+export { EXECUTION_SRV_URL, CONDUIT_SRV_URL, NEBULA_SRV_URL };

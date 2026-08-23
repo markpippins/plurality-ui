@@ -30,7 +30,7 @@ export function TopBar() {
     });
   };
 
-  const liveAllOk = isLiveMode && liveStatus.upstreams.executionSrv === 'ok' && liveStatus.upstreams.conduitSrv === 'ok';
+  const liveAllOk = isLiveMode && liveStatus.upstreams.executionSrv === 'ok' && liveStatus.upstreams.conduitSrv === 'ok' && liveStatus.upstreams.nebulaSrv === 'ok';
   const livePartiallyUp = isLiveMode && !liveAllOk && !liveStatus.probing && !liveStatus.error;
   const isVoting = roundtableSession?.status === 'voting';
   const unreadAlerts = alertHistory.filter(h => !h.acknowledged).length;
@@ -62,7 +62,7 @@ export function TopBar() {
                   ? 'bg-amber-950/50 text-amber-300 border-amber-800/60'
                   : 'bg-rose-950/50 text-rose-300 border-rose-800/60'
           }`}
-          title={liveStatus.error || `execution-srv ${liveStatus.upstreams.executionSrv} · conduit-srv ${liveStatus.upstreams.conduitSrv}`}
+          title={liveStatus.error || `execution-srv ${liveStatus.upstreams.executionSrv} · conduit-srv ${liveStatus.upstreams.conduitSrv} · nebula-srv ${liveStatus.upstreams.nebulaSrv}`}
         >
           {liveAllOk ? <Database className="w-3 h-3" /> : <CloudOff className="w-3 h-3" />}
           <span>{isLiveMode ? 'LIVE' : 'MOCK'}</span>

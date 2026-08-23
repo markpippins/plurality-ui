@@ -64,7 +64,7 @@ export function useSimulation() {
   const [liveStatus, setLiveStatus] = useState<LiveStatus>({
     mode: pluralityMode,
     probing: pluralityMode === 'live',
-    upstreams: { executionSrv: 'down', conduitSrv: 'down' },
+    upstreams: { executionSrv: 'down', conduitSrv: 'down', nebulaSrv: 'down' },
     error: null,
   });
 
