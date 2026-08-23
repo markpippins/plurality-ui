@@ -3509,6 +3509,18 @@ export class SimulatedBackendService {
     }
   }
 
+  /**
+   * Live-mode hydration: replace the in-memory work-request stream with real
+   * records fetched from canonical services (pluralityLive). The simulator
+   * remains the default only in explicit mock mode.
+   */
+  public hydrateWorkRequests(requests: WorkRequest[]) {
+    this.workRequestsSubject.next(requests);
+    if (requests.length > 0 && !this.activeWorkRequestSubject.getValue()) {
+      this.activeWorkRequestSubject.next(requests[0]);
+    }
+  }
+
   public reorderWorkRequests(reordered: WorkRequest[]) {
     this.workRequestsSubject.next(reordered);
   }

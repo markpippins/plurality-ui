@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { BackendService } from '../services/SimulatedBackendService';
 import { AlertService } from '../services/PerformanceAlertsService';
+import {
+  pluralityMode,
+  probeUpstreams,
+  fetchLiveWorkRequests,
+  LiveStatus,
+} from '../services/pluralityLive';
 import { 
   FileNode, WorkRequest, PlanIR, CritiqueIR, SpecIR, ExecutionIR, ValidationIR, 
   ActiveAgent, AgentLogEntry, Workspace, ChatMessage, AgentLog, ToastNotification, 
@@ -53,11 +59,44 @@ export function useSimulation() {
   const [isDualityMode, setIsDualityMode] = useState<boolean>(false);
   const [dualityState, setDualityState] = useState<DualityState>(INITIAL_DUALITY_STATE);
 
+  // Live-mode status (pluralityLive): mode + upstream health, surfaced in the
+  // TopBar so unavailable upstreams are visible instead of simulated success.
+  const [liveStatus, setLiveStatus] = useState<LiveStatus>({
+    mode: pluralityMode,
+    probing: pluralityMode === 'live',
+    upstreams: { executionSrv: 'down', conduitSrv: 'down' },
+    error: null,
+  });
+
   // Performance Alert Rules State
   const [alertRules, setAlertRules] = useState<PerformanceAlertRule[]>(AlertService.getRules());
   const [alertHistory, setAlertHistory] = useState<AlertBreachRecord[]>(AlertService.getHistory());
   const [alertSettings, setAlertSettings] = useState<AlertEngineSettings>(AlertService.getSettings());
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState<boolean>(false);
+
+  // In live mode, probe upstreams and hydrate the work-request list from
+  // real services. Failures surface as status/error — never simulated data.
+  useEffect(() => {
+    if (pluralityMode !== 'live') return;
+    let cancelled = false;
+    (async () => {
+      const upstreams = await probeUpstreams();
+      if (cancelled) return;
+      setLiveStatus(prev => ({ ...prev, probing: false, upstreams }));
+      try {
+        const requests = await fetchLiveWorkRequests(100);
+        if (cancelled) return;
+        if (requests.length > 0) {
+          BackendService.hydrateWorkRequests(requests);
+        }
+        setLiveStatus(prev => ({ ...prev, upstreams: { ...prev.upstreams, executionSrv: 'ok' } }));
+      } catch (err: any) {
+        if (cancelled) return;
+        setLiveStatus(prev => ({ ...prev, error: err?.message || 'Failed to load live work requests' }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const subs = [
@@ -191,6 +230,10 @@ export function useSimulation() {
     resetDualityState: () => BackendService.resetDualityState(),
     runDualityBenchmark: () => BackendService.runDualityBenchmark(),
     resetDualityMetrics: () => BackendService.resetDualityMetrics(),
+
+    // Live-mode status (pluralityLive)
+    liveStatus,
+    isLiveMode: pluralityMode === 'live',
 
     // Alert system state & actions
     alertRules,

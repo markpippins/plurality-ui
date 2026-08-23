@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Bell, Users, Sliders, Keyboard, Workflow, FileText, HelpCircle, AlertTriangle, Flame, Split, Sparkles, LayoutTemplate, ListTodo, Activity, TrendingUp } from 'lucide-react';
+import { Settings, Bell, Users, Sliders, Keyboard, Workflow, FileText, HelpCircle, AlertTriangle, Flame, Split, Sparkles, LayoutTemplate, ListTodo, Activity, TrendingUp, Database, CloudOff } from 'lucide-react';
 import { useSimulation } from '../hooks/useSimulation';
 import { GlobalSearchBar } from './GlobalSearchBar';
 import { WorkspaceLayoutSelector } from './WorkspaceLayoutSelector';
@@ -13,7 +13,8 @@ export function TopBar() {
     openPerformanceAlertsModal, alertRules, alertHistory, alertSettings,
     isDualityMode, toggleDualityMode,
     openTaskQueueModal, agentTaskQueue, layoutConfig, setLayoutMode,
-    performanceMetrics
+    performanceMetrics,
+    liveStatus, isLiveMode
   } = useSimulation();
 
   const handleTestNotification = () => {
@@ -29,6 +30,8 @@ export function TopBar() {
     });
   };
 
+  const liveAllOk = isLiveMode && liveStatus.upstreams.executionSrv === 'ok' && liveStatus.upstreams.conduitSrv === 'ok';
+  const livePartiallyUp = isLiveMode && !liveAllOk && !liveStatus.probing && !liveStatus.error;
   const isVoting = roundtableSession?.status === 'voting';
   const unreadAlerts = alertHistory.filter(h => !h.acknowledged).length;
   const activeRulesCount = alertRules.filter(r => r.enabled).length;
@@ -48,6 +51,28 @@ export function TopBar() {
       <GlobalSearchBar />
 
       <div className="flex items-center space-x-2 shrink-0">
+        {/* Live/Mock Mode Indicator — upstream availability is visible */}
+        <div
+          className={`flex items-center space-x-1.5 px-2 py-1 rounded-md text-[10px] font-mono font-semibold border ${
+            !isLiveMode
+              ? 'bg-purple-950/50 text-purple-300 border-purple-800/60'
+              : liveAllOk
+                ? 'bg-green-950/50 text-green-300 border-green-800/60'
+                : livePartiallyUp
+                  ? 'bg-amber-950/50 text-amber-300 border-amber-800/60'
+                  : 'bg-rose-950/50 text-rose-300 border-rose-800/60'
+          }`}
+          title={liveStatus.error || `execution-srv ${liveStatus.upstreams.executionSrv} · conduit-srv ${liveStatus.upstreams.conduitSrv}`}
+        >
+          {liveAllOk ? <Database className="w-3 h-3" /> : <CloudOff className="w-3 h-3" />}
+          <span>{isLiveMode ? 'LIVE' : 'MOCK'}</span>
+          {isLiveMode && !liveStatus.probing && (
+            <span className="opacity-80">
+              {liveAllOk ? 'OK' : livePartiallyUp ? 'PARTIAL' : 'DOWN'}
+            </span>
+          )}
+        </div>
+
         {/* Agent Metrics View Mode Button */}
         <button
           id="topbar-metrics-view-btn"
