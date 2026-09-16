@@ -1,8 +1,8 @@
 // Plurality live provider — environment-gated. When VITE_PLURALITY_MODE=live
 // (the installed unit's default), the app hydrates its work-request surface
-// from canonical services (execution-srv:3110 / conduit-srv:3104) instead of
-// simulating success, and reports upstream availability to the UI. The
-// in-browser simulator remains available only when mock mode is explicitly
+// from canonical services (broker worker.execution catalog / conduit-srv:3104)
+// instead of simulating success, and reports upstream availability to the UI.
+// The in-browser simulator remains available only when mock mode is explicitly
 // selected (VITE_PLURALITY_MODE=mock).
 import {
   WorkRequest,
@@ -31,7 +31,13 @@ export interface LiveStatus {
 export const pluralityMode: PluralityMode =
   (import.meta as any).env?.VITE_PLURALITY_MODE === 'mock' ? 'mock' : 'live';
 
-const EXECUTION_SRV_URL = (import.meta as any).env?.VITE_EXECUTION_SRV_URL || 'http://localhost:3110';
+// M2 cutover: default execution surface is the broker gateway's
+// worker.execution catalog (same 18-route contract as legacy execution-srv,
+// mounted at /api/workers/execution — paths below are catalog-relative).
+// Rollback: VITE_EXECUTION_SRV_URL=http://localhost:3110 restores legacy,
+// but the /api/execution infix below must come back with it (broker paths
+// are catalog-relative by design).
+const EXECUTION_SRV_URL = (import.meta as any).env?.VITE_EXECUTION_SRV_URL || 'http://localhost:4080/api/workers/execution';
 const CONDUIT_SRV_URL = (import.meta as any).env?.VITE_CONDUIT_SRV_URL || 'http://localhost:3104';
 const NEBULA_SRV_URL = (import.meta as any).env?.VITE_NEBULA_SRV_URL || 'http://localhost:3101';
 
@@ -55,11 +61,12 @@ export async function probeUpstreams(): Promise<UpstreamStatus> {
   return { executionSrv, conduitSrv, nebulaSrv };
 }
 
-// Map a real execution-srv request row to the plurality WorkRequest shape.
+// Map a real execution-catalog request row to the plurality WorkRequest shape.
 function mapExecutionRequest(row: any): WorkRequest {
   const rawStatus = String(row?.status || 'READY');
-  // execution-srv uses READY/RUNNING/COMPLETED/CANCELLED/FAILED/DRAFT;
-  // map onto the plurality AppState vocabulary used by the UI category fn.
+  // Execution catalog uses READY/RUNNING/COMPLETED/CANCELLED/FAILED/DRAFT
+  // (identical on legacy execution-srv and broker worker.execution — verified
+  // M2 parity); map onto the plurality AppState vocabulary used by the UI.
   const status: AppState =
     rawStatus === 'COMPLETED' ? 'VALIDATE' :
     rawStatus === 'CANCELLED' || rawStatus === 'FAILED' ? 'FAILED' :
@@ -80,10 +87,10 @@ function mapExecutionRequest(row: any): WorkRequest {
   };
 }
 
-/** Fetch the real work-request list from execution-srv. Throws on failure. */
+/** Fetch the real work-request list from the execution surface. Throws on failure. */
 export async function fetchLiveWorkRequests(limit = 100): Promise<WorkRequest[]> {
-  const res = await fetch(`${EXECUTION_SRV_URL}/api/execution/requests?limit=${limit}`);
-  if (!res.ok) throw new Error(`execution-srv returned HTTP ${res.status}`);
+  const res = await fetch(`${EXECUTION_SRV_URL}/requests?limit=${limit}`);
+  if (!res.ok) throw new Error(`execution surface returned HTTP ${res.status}`);
   const data = await res.json();
   const items = data?.items || [];
   return items.map(mapExecutionRequest);
